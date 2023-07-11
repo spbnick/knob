@@ -269,25 +269,25 @@ class EntityReference(Reference):
             self.type_name == other.type_name and \
             self.name == other.name
 
-    def __rshift__(self, other):
+    def __gt__(self, other):
         """
         Set yourself as the "source" role of an (implicit typeless) relation
         """
         if isinstance(other, EntityReference):
-            other = self.graph.relations() >> other
+            other = self.graph.relations() > other
         if not isinstance(other, RelationReference):
             return NotImplemented
-        return other << self
+        return other < self
 
-    def __lshift__(self, other):
+    def __lt__(self, other):
         """
         Set yourself as the "target" role of an (implicit typeless) relation
         """
         if isinstance(other, EntityReference):
-            other = self.graph.relations() << other
+            other = self.graph.relations() < other
         if not isinstance(other, RelationReference):
             return NotImplemented
-        return other >> self
+        return other > self
 
     def update_attrs(self, **attrs):
         """
@@ -338,13 +338,13 @@ class RelationReference(Reference):
             self.type_name == other.type_name and \
             self.roles == other.roles
 
-    def __rshift__(self, other):
+    def __gt__(self, other):
         """Set an entity as the "target" role"""
         if not isinstance(other, EntityReference):
             return NotImplemented
         return self.update_roles(**{TARGET_ROLE_NAME: other})
 
-    def __lshift__(self, other):
+    def __lt__(self, other):
         """Set an entity as the "source" role"""
         if not isinstance(other, EntityReference):
             return NotImplemented
