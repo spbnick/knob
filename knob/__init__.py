@@ -34,22 +34,6 @@ An overview of various types and how they're used:
 
     RelationTypeAccessor:
         __call__(): RelationReference
-
-Usage examples:
-
-    g = Graph()
-    e = g.entities
-    r = g.relations
-
-    R.ll_state_transition(origin=advertising
-
-
-    advertising = E.ll_state(attribute=10, attribute=20)
-
-    E.ll_state("Standby", attribute=10, attribute=20) ==
-                          R.ll_state_transition(attribute=True,
-                                                role=E.ll_state("Scanning"))
-        > E.ll_state("Advertising")
 """
 
 from collections import defaultdict
