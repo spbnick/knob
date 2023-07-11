@@ -1,0 +1,45 @@
+So, what if the relation reference has less roles than the one in the
+database?
+
+What if it has a subset of roles compared to multiple relations in the database?
+
+Which one is it referencing then?
+
+A relation with more roles inherits and overrides the attributes of the
+relation with less roles, but only at render time and at access time
+
+In which order does a relation inherit attributes from relations with the same
+amount but different roles missing? Undefined. Don't do that.
+
+Or should we just make a reference to a relation with less roles update
+existing relations with more roles? And create relations with non existing set
+of roles? Or perhaps we should always just create relations with non-existing
+set of roles, at least for the start?
+
+That sounds better.
+
+---
+FORMAT:
+
+Taking inspiration from graphviz, but purely-data oriented, and with support
+for relations (hypergraphs).
+
+"<name>"
+    - entity
+<name>
+    - entity
+
+entity -[]-> entity
+    - implicit relation with source and target
+
+---
+So, maybe if we have two items, like e.a.b, we say that a is type and b is
+name. And if we have only one item, like e.b, we say that b is name and there
+is no type, because you can have an entity without a type, but you cannot have
+an entity without a name?
+
+What about relations? There's just two cases: type or no type, so it's always
+type.
+
+But we could only figure that out when we actually use those, so perhaps we
+better avoid that kind of complexity.
