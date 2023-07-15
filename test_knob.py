@@ -307,20 +307,118 @@ digraph {
 }
 """
 
+def test_graphviz_binary_relation_entity_list_both(g, n, r):
+    """
+    Check graphviz rendering of a binary relation having entity list as both
+    the source and the target.
+    """
+    [n.A, n.B] >> r.X >> [n.C, n.D]
+    print(g.render_graphviz())
+    assert g.render_graphviz() == """\
+digraph {
+\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
+\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
+\t"('', 'C')" [label=C knob_domain=entity knob_type="" shape=box]
+\t"('', 'D')" [label=D knob_domain=entity knob_type="" shape=box]
+\t"('', 'A')" -> "('', 'C')" [label=X knob_domain=relation knob_type=X]
+\t"('', 'A')" -> "('', 'D')" [label=X knob_domain=relation knob_type=X]
+\t"('', 'B')" -> "('', 'C')" [label=X knob_domain=relation knob_type=X]
+\t"('', 'B')" -> "('', 'D')" [label=X knob_domain=relation knob_type=X]
+}
+"""
+
+def test_graphviz_ternary_relation_entity_list_all(g, n, r):
+    """
+    Check graphviz rendering of a binary relation having entity list as both
+    the source and the target.
+    """
+    [n.A, n.B] >> r.X(middle=[n.C, n.D]) >> [n.E, n.F]
+    assert g.render_graphviz() == """\
+digraph {
+\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
+\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
+\t"('', 'C')" [label=C knob_domain=entity knob_type="" shape=box]
+\t"('', 'D')" [label=D knob_domain=entity knob_type="" shape=box]
+\t"('', 'E')" [label=E knob_domain=entity knob_type="" shape=box]
+\t"('', 'F')" [label=F knob_domain=entity knob_type="" shape=box]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+-> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+-> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+-> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+-> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+-> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+-> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+-> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+-> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+-> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+-> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+-> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+-> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+-> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+-> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+-> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+-> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+-> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+-> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+-> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+-> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+-> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+-> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+-> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+-> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+}
+"""
+
 def test_graphviz_binary_relation_conflict(g, n, r):
     """Check binary relation conflict rendering into graphviz"""
-    with pytest.raises(
-        Exception,
-        match=r"Attempting to change a relation template role"
-    ):
-        n.A >> r.X << n.B
+    n.A >> r.X << n.B
     assert g.render_graphviz() == """\
 digraph {
 \t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
 \t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
 \t"(('source', ('', 'A')),)" [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('source', ('', 'A')),)" -> "('', 'A')" \
-[label=source knob_domain=role knob_type=source style=dashed]
+\t"(('source', ('', 'A')),)" -> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('source', ('', 'B')),)" [label=X knob_domain=relation knob_type=X shape=diamond]
+\t"(('source', ('', 'B')),)" -> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
 }
 """
 

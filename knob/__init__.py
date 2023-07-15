@@ -308,24 +308,62 @@ class EntityDomainAccessor:
 class RelationTemplate:
     """A template for a relation"""
 
+    def relation_roles_iter(self, relation_roles=frozenset()):
+        """
+        Create a generator returning relation roles for the template roles.
+
+        Args:
+            relation_roles: The frozenset of already-collected relation roles
+                            in the order of role names in self.roles.
+
+        Returns:
+            A generator returning frozensets of relation roles, each being a
+            tuple containing:
+            * a role name, and
+            * a tuple of entity's type name and name.
+        """
+        assert isinstance(relation_roles, frozenset)
+        assert all(isinstance(role, tuple) and len(role) == 2 and
+                   isinstance(role[0], str) and
+                   isinstance(role[1], tuple) and len(role[1]) == 2 and
+                   isinstance(role[1][0], str) and isinstance(role[1][1], str)
+                   for role in relation_roles)
+        assert len(relation_roles) <= len(self.roles)
+        assert set(tuple(self.roles)[0:len(relation_roles)]) == \
+            {role[0] for role in relation_roles}
+
+        if len(relation_roles) == len(self.roles):
+            yield relation_roles
+            return
+
+        role_name = tuple(self.roles)[len(relation_roles)]
+        for entity in self.roles[role_name]:
+            yield from self.relation_roles_iter(
+                relation_roles | frozenset(((role_name, entity),))
+            )
+
     def __init__(self, graph: Graph, type_name: str,
-                 roles: frozenset, attrs: dict):
+                 roles: dict, attrs: dict):
         """
         Initialize a relation template.
 
         Args:
-            graph:              The graph the relation belongs to.
-            type_name:          The name of the type of the relation.
-            roles:              A frozenset with tuples, two items each:
-                                * Role name
-                                * A tuple with entity's type name and name.
-            attrs:              A dictionary of attribute names and values.
+            graph:      The graph the relation belongs to.
+            type_name:  The name of the type of the relation.
+            roles:      A dictionary of role names and (non-empty) tuples of
+                        tuples containing an entity's type name and name each.
+            attrs:      A dictionary of attribute names and values.
         """
         assert all(
             isinstance(role, str) and
-            isinstance(entity, tuple) and len(entity) == 2 and
-            isinstance(entity[0], str) and isinstance(entity[1], str)
-            for role, entity in roles
+            isinstance(entities, tuple) and
+            len(entities) > 0 and
+            all(
+                isinstance(entity, tuple) and len(entity) == 2 and
+                isinstance(entity[0], str) and isinstance(entity[1], str)
+                for entity in entities
+            )
+            for role, entities in roles.items()
         )
         assert all(
             isinstance(k, str) and isinstance(v, ATTR_TYPES)
@@ -335,75 +373,60 @@ class RelationTemplate:
         self.type_name = type_name
         self.roles = roles
         self.attrs = attrs
-        # Create/replace relation attributes
-        self.graph._relation_types_roles_attrs[self.type_name][self.roles] = \
-            attrs.copy()
+        # Create/replace relations (attributes)
+        for relation_roles in self.relation_roles_iter():
+            self.graph._relation_types_roles_attrs \
+                [self.type_name][relation_roles] = self.attrs.copy()
 
     def __rshift__(self, other_or_cont):
         """
         Set (a container of) entities as the "target" role for the template
         relation.
         """
-        other_cont = other_or_cont \
-            if isinstance(other_or_cont, CONT_TYPES) \
-            else [other_or_cont]
-        for other in other_cont:
-            if isinstance(other, EntityReference):
-                self(**{TARGET_ROLE_NAME: other})
-            else:
-                return NotImplemented
-        return other_or_cont
+        if isinstance(other_or_cont, EntityReference) or \
+                isinstance(other_or_cont, CONT_TYPES) and \
+                all(isinstance(other, EntityReference)
+                    for other in other_or_cont):
+            self(**{TARGET_ROLE_NAME: other_or_cont})
+            return other_or_cont
+        return NotImplemented
 
     def __rlshift__(self, other_or_cont):
         """
         Set (a container of) entities as the "target" role for the template
         relation.
         """
-        result_list = []
-        other_cont = other_or_cont \
-            if isinstance(other_or_cont, CONT_TYPES) \
-            else [other_or_cont]
-        for other in other_cont:
-            if isinstance(other, EntityReference):
-                result_list.append(self(**{TARGET_ROLE_NAME: other}))
-            else:
-                return NotImplemented
-        return type(other_cont)(result_list) \
-            if other_cont is other_or_cont \
-            else result_list[0]
+        if isinstance(other_or_cont, EntityReference) or \
+                isinstance(other_or_cont, CONT_TYPES) and \
+                all(isinstance(other, EntityReference)
+                    for other in other_or_cont):
+            return self(**{TARGET_ROLE_NAME: other_or_cont})
+        return NotImplemented
 
     def __lshift__(self, other_or_cont):
         """
         Set (a container of) entities as the "source" role for the template
         relation.
         """
-        other_cont = other_or_cont \
-            if isinstance(other_or_cont, CONT_TYPES) \
-            else [other_or_cont]
-        for other in other_cont:
-            if isinstance(other, EntityReference):
-                self(**{SOURCE_ROLE_NAME: other})
-            else:
-                return NotImplemented
-        return other_or_cont
+        if isinstance(other_or_cont, EntityReference) or \
+                isinstance(other_or_cont, CONT_TYPES) and \
+                all(isinstance(other, EntityReference)
+                    for other in other_or_cont):
+            self(**{SOURCE_ROLE_NAME: other_or_cont})
+            return other_or_cont
+        return NotImplemented
 
     def __rrshift__(self, other_or_cont):
         """
         Set (a container of) entities as the "source" role for the template
         relation.
         """
-        result_list = []
-        other_cont = other_or_cont \
-            if isinstance(other_or_cont, CONT_TYPES) \
-            else [other_or_cont]
-        for other in other_cont:
-            if isinstance(other, EntityReference):
-                result_list.append(self(**{SOURCE_ROLE_NAME: other}))
-            else:
-                return NotImplemented
-        return type(other_cont)(result_list) \
-            if other_cont is other_or_cont \
-            else result_list[0]
+        if isinstance(other_or_cont, EntityReference) or \
+                isinstance(other_or_cont, CONT_TYPES) and \
+                all(isinstance(other, EntityReference)
+                    for other in other_or_cont):
+            return self(**{SOURCE_ROLE_NAME: other_or_cont})
+        return NotImplemented
 
     def __call__(self, **attrs_and_roles) -> 'RelationTemplate':
         """
@@ -412,38 +435,46 @@ class RelationTemplate:
 
         Args:
             attrs_and_roles:    A dictionary of attribute names and values,
-                                and/or role names and entities to add/modify.
+                                and/or role names and (containers of) entities
+                                to add/modify.
 
         Returns:
             The reference to the (updated) relation.
         """
         assert all(
-            isinstance(k, str) and
-            isinstance(v, (EntityReference,) + ATTR_TYPES)
+            isinstance(k, str) and (
+                isinstance(v, (EntityReference,) + ATTR_TYPES) or
+                isinstance(v, CONT_TYPES) and
+                all(isinstance(e, EntityReference) for e in v)
+            )
             for k, v in attrs_and_roles.items()
         )
 
         # Create updated roles and attributes
-        roles = dict(self.roles)
+        roles = self.roles.copy()
         attrs = self.attrs.copy()
         for key, value in attrs_and_roles.items():
             if isinstance(value, EntityReference):
-                if key in roles:
-                    raise Exception(
-                        "Attempting to change a relation template role"
-                    )
-                roles[key] = (value.type_name, value.name)
+                value = (value,)
+            if isinstance(value, CONT_TYPES):
+                if len(value) == 0:
+                    continue
+                if key not in roles:
+                    roles[key] = tuple()
+                roles[key] += tuple(
+                    (entity.type_name, entity.name) for entity in value
+                )
             else:
                 attrs[key] = value
-        roles = frozenset(roles.items())
 
-        # If we're adding (not keeping or changing) roles
-        if roles > self.roles:
-            # Remove the attributes from the old roles
-            self.graph._relation_types_roles_attrs[self.type_name]. \
-                pop(self.roles, {})
+        # If we're adding new roles
+        if set(roles) > set(self.roles):
+            # Remove (the attributes from) the old roles
+            for relation_roles in self.relation_roles_iter():
+                self.graph._relation_types_roles_attrs[self.type_name]. \
+                    pop(relation_roles, None)
 
-        # Create the new template (and relation)
+        # Create the new template (and relations)
         return type(self)(self.graph, self.type_name, roles, attrs)
 
 
@@ -456,8 +487,8 @@ class RelationDomainAccessor:
 
     def __getattr__(self, type_name: str) -> RelationTemplate:
         """Create a relation template for a type"""
-        return RelationTemplate(self.graph, type_name, frozenset(), {})
+        return RelationTemplate(self.graph, type_name, {}, {})
 
     def __getitem__(self, type_name: str) -> RelationTemplate:
         """Create a relation template for a type"""
-        return RelationTemplate(self.graph, type_name, frozenset(), {})
+        return RelationTemplate(self.graph, type_name, {}, {})
