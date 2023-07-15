@@ -154,14 +154,31 @@ class Graph:
                     )
                     # Create the role edges
                     for role, entity in sorted_roles:
-                        graph.edge(
-                            name, repr(entity), label=role,
-                            _attributes=dict(
-                                style="dashed",
-                                knob_domain="role",
-                                knob_type=role
+                        if role == SOURCE_ROLE_NAME:
+                            graph.edge(
+                                repr(entity), name,
+                                _attributes=dict(
+                                    knob_domain="role",
+                                    knob_type=role
+                                )
                             )
-                        )
+                        elif role == TARGET_ROLE_NAME:
+                            graph.edge(
+                                name, repr(entity),
+                                _attributes=dict(
+                                    knob_domain="role",
+                                    knob_type=role
+                                )
+                            )
+                        else:
+                            graph.edge(
+                                repr(entity), name, label=role,
+                                _attributes=dict(
+                                    style="dashed",
+                                    knob_domain="role",
+                                    knob_type=role
+                                )
+                            )
 
     def render_graphviz(self):
         """
