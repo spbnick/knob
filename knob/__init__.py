@@ -139,8 +139,9 @@ class Graph:
                     )
                 # Else this is a complex (non-binary) relation
                 else:
+                    sorted_roles = tuple(sorted(roles))
                     # Relation node name
-                    name = repr(tuple(sorted(roles)))
+                    name = repr(sorted_roles)
                     # Create the relation node
                     graph.node(
                         name, label=relation_type,
@@ -152,7 +153,7 @@ class Graph:
                         )
                     )
                     # Create the role edges
-                    for role, entity in roles:
+                    for role, entity in sorted_roles:
                         graph.edge(
                             name, repr(entity), label=role,
                             _attributes=dict(
