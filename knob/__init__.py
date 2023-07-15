@@ -68,6 +68,9 @@ import graphviz
 # Accepted attribute types (must be a tuple of types)
 ATTR_TYPES = (str, bool, int, float)
 
+# Accepted entity/relation container types (must be a tuple of types)
+CONT_TYPES = (set, frozenset, list, tuple)
+
 # The name of the source role
 SOURCE_ROLE_NAME = "source"
 
@@ -200,7 +203,7 @@ class EntityReference:
         """
         result_list = []
         other_cont = other_or_cont \
-            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            if isinstance(other_or_cont, CONT_TYPES) \
             else [other_or_cont]
         for other in other_cont:
             if isinstance(other, EntityReference):
@@ -229,7 +232,7 @@ class EntityReference:
         """
         result_list = []
         other_cont = other_or_cont \
-            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            if isinstance(other_or_cont, CONT_TYPES) \
             else [other_or_cont]
         for other in other_cont:
             if isinstance(other, EntityReference):
@@ -341,7 +344,7 @@ class RelationTemplate:
         relation.
         """
         other_cont = other_or_cont \
-            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            if isinstance(other_or_cont, CONT_TYPES) \
             else [other_or_cont]
         for other in other_cont:
             if isinstance(other, EntityReference):
@@ -357,7 +360,7 @@ class RelationTemplate:
         """
         result_list = []
         other_cont = other_or_cont \
-            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            if isinstance(other_or_cont, CONT_TYPES) \
             else [other_or_cont]
         for other in other_cont:
             if isinstance(other, EntityReference):
@@ -374,7 +377,7 @@ class RelationTemplate:
         relation.
         """
         other_cont = other_or_cont \
-            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            if isinstance(other_or_cont, CONT_TYPES) \
             else [other_or_cont]
         for other in other_cont:
             if isinstance(other, EntityReference):
@@ -390,7 +393,7 @@ class RelationTemplate:
         """
         result_list = []
         other_cont = other_or_cont \
-            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            if isinstance(other_or_cont, CONT_TYPES) \
             else [other_or_cont]
         for other in other_cont:
             if isinstance(other, EntityReference):
