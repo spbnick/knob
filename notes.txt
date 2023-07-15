@@ -43,3 +43,27 @@ type.
 
 But we could only figure that out when we actually use those, so perhaps we
 better avoid that kind of complexity.
+
+---
+So, let's change to this way:
+
+A call is for setting attributes/roles, but to access a named entity we can
+just use attribute access or indexing. We don't have to spell out a call.
+
+We also don't have to do a call for relations.
+
+Just referencing is enough to create an entity/relation.
+
+---
+So, the problem with relations is that we want to be able to assign their
+roles gradually, and not have an indication of when we're done.
+Additionally, a relation doesn't have any roles at first.
+
+Then, we want to be able to keep an incomplete relation, having a type, some
+attributes, and maybe a few roles as a template and instantiate it for
+connection to multiple other entities.
+
+Can we just always pass around a relation template and create a relation each
+time its roles are added or changed? And then remove all relations which are
+subsets of the one being created from the graph? Because e.g. in Graphviz it's
+not possible to remove roles, only to add?

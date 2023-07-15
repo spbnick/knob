@@ -1,39 +1,62 @@
 """
 KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 
-Class inheritance diagram:
-
-    Graph
-
-    Accessor
-        DomainAccessor
-            EntityAccessor
-            RelationAccessor
-        TypeAccessor
-            EntityTypeAccessor
-            RelationTypeAccessor
-
-    Reference
-        EntityReference
-        RelationReference
-
 An overview of various types and how they're used:
 
     Graph:
-        entities: EntityAccessor
-        relations: RelationAccessor
+        entities: EntityDomainAccessor
+        relations: RelationDomainAccessor
 
-    EntityAccessor:
-        __attr__(): EntityTypeAccessor
+    EntityDomainAccessor:
+        __getattr__(type_name): EntityTypeAccessor
+        __getitem__(type_name): EntityTypeAccessor
 
     EntityTypeAccessor:
-        __call__(): EntityReference
+        __getattr__(name): EntityReference
+        __getitem__(name): EntityReference
 
-    RelationAccessor:
-        __attr__(): RelationTypeAccessor
+    EntityReference:
+        __lshift__(EntityReference): EntityReference
+        __rshift__(EntityReference): EntityReference
+        __lshift__(RelationTemplate): RelationTemplate
+        __rshift__(RelationTemplate): RelationTemplate
 
-    RelationTypeAccessor:
-        __call__(): RelationReference
+    RelationDomainAccessor:
+        __getattr__(type_name): RelationTemplate
+        __getitem__(type_name): RelationTemplate
+
+    RelationTemplate:
+        __call__(attrs_and_roles): RelationTemplate
+        __lshift__(EntityReference): EntityReference
+        __rshift__(EntityReference): EntityReference
+
+Access patterns:
+
+    Graph
+     |
+     |    EntityDomainAccessor
+     |     |
+     |     |       EntityTypeAccessor
+     |     |        |
+     |     |        |     EntityReference
+     |     |        |      |
+     v     v        v      v
+    graph.entities.<type>.<name>(**attrs)
+
+    Graph
+     |
+     |    RelationDomainAccessor
+     |     |
+     |     |       RelationTemplate
+     |     |        |
+     v     v        v
+    graph.relations.<type>(**attrs_and_roles) >> entity
+
+Notes:
+
+    All role-assignment operations ('<<' and '>>') return the right operand.
+    Relations are created whenever a relation template is created/updated.
+    Adding a role to a relation (template) deletes the old relation.
 """
 
 from collections import defaultdict
@@ -56,52 +79,43 @@ class Graph:
     """A graph"""
 
     def __init__(self):
+        """Initialize the graph"""
         self._entity_types_names_attrs = \
             defaultdict(lambda: defaultdict(dict))
         self._relation_types_roles_attrs = \
             defaultdict(lambda: defaultdict(dict))
-        self.entities = EntityAccessor(self)
-        self.relations = RelationAccessor(self)
+        self.entities = EntityDomainAccessor(self)
+        self.relations = RelationDomainAccessor(self)
 
-    def render_graphviz(self):
+    def _render_graphviz_entities(self, graph):
         """
-        Render the graph into Graphviz source code.
+        Render the graph entities into a Graphviz graph.
 
-        Returns:
-            The rendered Graphviz source code string.
+        Args:
+            graph:  The graphviz graph to render entities into.
         """
-        def node_name(type_name, name):
-            """
-            Convert an entity tuple from the _entity_types_names_attrs
-            dictionary to a Graphviz node name.
-
-            Attrs:
-                type:   The entity type name.
-                name:   The entity name.
-
-            Returns:
-                The node name.
-            """
-            return name if type_name == "" else repr((type_name, name))
-
-        # Create an empty graph
-        graph = graphviz.Digraph()
-
-        # Add entities
         for entity_type, names_attrs in \
                 self._entity_types_names_attrs.items():
             for name, attrs in names_attrs.items():
                 graph.node(
-                    node_name(entity_type, name), label=name,
+                    repr((entity_type, name)),
+                    label=f"{entity_type}:\n{name}" if entity_type else name,
                     _attributes=dict(
                         [("shape", "box"),
                          ("knob_domain", "entity"),
                          ("knob_type", entity_type)] +
-                        [("knob_attr_" + n, v) for n, v in attrs.items()]
+                        [("knob_attr_" + n, str(v))
+                         for n, v in attrs.items()]
                     )
                 )
 
-        # Add relations
+    def _render_graphviz_relations(self, graph):
+        """
+        Render the graph relations into a Graphviz graph.
+
+        Args:
+            graph:  The graphviz graph to render relations into.
+        """
         for relation_type, roles_attrs in \
                 self._relation_types_roles_attrs.items():
             for roles, attrs in roles_attrs.items():
@@ -110,13 +124,14 @@ class Graph:
                 if set(roles_dict) == {SOURCE_ROLE_NAME, TARGET_ROLE_NAME}:
                     # Create the relation edge
                     graph.edge(
-                        node_name(*roles_dict[SOURCE_ROLE_NAME]),
-                        node_name(*roles_dict[TARGET_ROLE_NAME]),
+                        repr(roles_dict[SOURCE_ROLE_NAME]),
+                        repr(roles_dict[TARGET_ROLE_NAME]),
                         label=relation_type,
                         _attributes=dict(
                             [("knob_domain", "relation"),
                              ("knob_type", relation_type)] +
-                            [("knob_attr_" + n, v) for n, v in attrs.items()]
+                            [("knob_attr_" + n, str(v))
+                             for n, v in attrs.items()]
                         )
                     )
                 # Else this is a complex (non-binary) relation
@@ -136,7 +151,7 @@ class Graph:
                     # Create the role edges
                     for role, entity in roles:
                         graph.edge(
-                            name, node_name(*entity), label=role,
+                            name, repr(entity), label=role,
                             _attributes=dict(
                                 style="dashed",
                                 knob_domain="role",
@@ -144,105 +159,30 @@ class Graph:
                             )
                         )
 
-        # Return the graphviz source
+    def render_graphviz(self):
+        """
+        Render the graph into Graphviz source code.
+
+        Returns:
+            The rendered Graphviz source code string.
+        """
+        graph = graphviz.Digraph()
+        self._render_graphviz_entities(graph)
+        self._render_graphviz_relations(graph)
         return graph.source
 
 
-class Accessor:
-    """A abstract (graph) accessor"""
-
-    def __init__(self, graph: Graph):
-        """
-        Initialize the accessor.
-
-        Args:
-            graph:  The graph which the accessor is serving.
-        """
-        self.graph = graph
-
-
-class TypeAccessor(Accessor):
-    """An abstract object (entity/relation) type accessor"""
-
-    def __init__(self, graph: Graph, type_name: str):
-        super().__init__(graph)
-        self.type_name = type_name
-
-
-class Reference:
-    """An abstract object (entity/relation) reference"""
-
-    def __init__(self, graph: Graph, type_name: str):
-        """
-        Initialize an object reference (partially).
-
-        Args:
-            graph:      The graph the object belongs to.
-            type_name:  The name of the type of the object.
-        """
-        self.graph = graph
-        self.type_name = type_name
-
-
-class DomainAccessor(Accessor):
-    """A abstract domain (entities/relations) accessor"""
-
-    # The type of type accessor to use
-    type_accessor: type = TypeAccessor
-
-    def __init__(self, graph: Graph):
-        """
-        Initialize the domain accessor.
-
-        Args:
-            graph:  The graph which the accessor is serving.
-        """
-        assert isinstance(type(self).type_accessor, type) and \
-            issubclass(type(self).type_accessor, TypeAccessor)
-        super().__init__(graph)
-
-    def __getattr__(self, type_name: str) -> TypeAccessor:
-        """
-        Access an object type.
-
-        Args:
-            type_name:  The name of the type to access.
-
-        Returns:
-            An object type accessor (TypeAccessor).
-        """
-        return type(self).type_accessor(self.graph, type_name)
-
-    def __getitem__(self, type_name: str) -> TypeAccessor:
-        """
-        Access an object type.
-
-        Args:
-            type_name:  The name of the type to access.
-
-        Returns:
-            An object type accessor (TypeAccessor).
-        """
-        return type(self).type_accessor(self.graph, type_name)
-
-
-class EntityReference(Reference):
+class EntityReference:
     """An entity reference"""
 
-    def __init__(self, graph, type_name, name):
-        """
-        Initialize an entity reference.
-
-        Args:
-            graph:      The graph the object belongs to.
-            type_name:  The name of the type of the object.
-            name:       The name of the object.
-        """
-        assert isinstance(graph, Graph)
-        assert isinstance(type_name, str)
-        assert isinstance(name, str)
-        super().__init__(graph, type_name)
+    def __init__(self, graph: Graph, type_name: str, name: str):
+        """Initialize an entity reference"""
+        self.graph = graph
+        self.type_name = type_name
         self.name = name
+        # Make sure the entity exists
+        # It's OK, pylint: disable=pointless-statement
+        self.graph._entity_types_names_attrs[self.type_name][self.name]
 
     def __hash__(self):
         return hash((id(self.graph), self.type_name, self.name))
@@ -253,37 +193,74 @@ class EntityReference(Reference):
             self.type_name == other.type_name and \
             self.name == other.name
 
-    def __gt__(self, other):
+    def __rshift__(self, other_or_cont):
         """
-        Set yourself as the "source" role of an (implicit typeless) relation
+        Set yourself as the "source" role of (a container of) (implicit
+        typeless) relations.
         """
-        if isinstance(other, EntityReference):
-            other = self.graph.relations() > other
-        if not isinstance(other, RelationReference):
-            return NotImplemented
-        return other < self
+        result_list = []
+        other_cont = other_or_cont \
+            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            else [other_or_cont]
+        for other in other_cont:
+            if isinstance(other, EntityReference):
+                self.graph.relations[""](**{SOURCE_ROLE_NAME: self,
+                                            TARGET_ROLE_NAME: other})
+            elif isinstance(other, RelationTemplate):
+                other = other(**{SOURCE_ROLE_NAME: self})
+            else:
+                return NotImplemented
+            result_list.append(other)
+        return type(other_cont)(result_list) \
+            if other_cont is other_or_cont \
+            else result_list[0]
 
-    def __lt__(self, other):
+    def __rlshift__(self, other_or_cont):
         """
-        Set yourself as the "target" role of an (implicit typeless) relation
+        Set yourself as the "source" role of (a container of) (implicit
+        typeless) relations.
         """
-        if isinstance(other, EntityReference):
-            other = self.graph.relations() < other
-        if not isinstance(other, RelationReference):
-            return NotImplemented
-        return other > self
+        return self.__rshift__(other_or_cont)
 
-    def update_attrs(self, **attrs):
+    def __lshift__(self, other_or_cont):
         """
-        Update/add entity's attributes.
+        Set yourself as the "target" role of (a container of) (implicit
+        typeless) relations.
+        """
+        result_list = []
+        other_cont = other_or_cont \
+            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            else [other_or_cont]
+        for other in other_cont:
+            if isinstance(other, EntityReference):
+                self.graph.relations[""](**{TARGET_ROLE_NAME: self,
+                                            SOURCE_ROLE_NAME: other})
+            elif isinstance(other, RelationTemplate):
+                other = other(**{TARGET_ROLE_NAME: self})
+            else:
+                return NotImplemented
+            result_list.append(other)
+        return type(other_cont)(result_list) \
+            if other_cont is other_or_cont \
+            else result_list[0]
+
+    def __rrshift__(self, other_or_cont):
+        """
+        Set yourself as the "target" role of (a container of) (implicit
+        typeless) relations.
+        """
+        return self.__lshift__(other_or_cont)
+
+    def __call__(self, **attrs) -> 'EntityReference':
+        """
+        Add/modify entity attributes.
 
         Args:
-            attrs:  The attributes to update/add.
+            attrs:  The attributes of the entity to add/modify.
 
         Returns:
-            Self.
+            The reference to the (updated) entity.
         """
-        assert isinstance(attrs, dict)
         assert all(isinstance(k, str) and isinstance(v, ATTR_TYPES)
                    for k, v in attrs.items())
         self.graph._entity_types_names_attrs[self.type_name][self.name]. \
@@ -291,144 +268,147 @@ class EntityReference(Reference):
         return self
 
 
-class RelationReference(Reference):
-    """A relation reference"""
-
-    def __init__(self, graph: Graph, type_name: str, **roles):
-        """
-        Initialize a relation reference.
-
-        Args:
-            graph:      The graph the object belongs to.
-            type_name:  The name of the type of the object.
-            roles:      A dictionary of role names and references to entities
-                        fulfilling those roles.
-        """
-        assert isinstance(roles, dict)
-        assert all(isinstance(k, str) and isinstance(v, EntityReference)
-                   for k, v in roles.items())
-        super().__init__(graph, type_name)
-        self.roles = frozenset(
-            (name, (entity.type_name, entity.name))
-            for name, entity in roles.items()
-        )
-
-    def __hash__(self):
-        return hash((id(self.graph), self.type_name, self.roles))
-
-    def __eq__(self, other):
-        return isinstance(other, RelationReference) and \
-            self.graph is other.graph and \
-            self.type_name == other.type_name and \
-            self.roles == other.roles
-
-    def __gt__(self, other):
-        """Set an entity as the "target" role"""
-        if not isinstance(other, EntityReference):
-            return NotImplemented
-        return self.update_roles(**{TARGET_ROLE_NAME: other})
-
-    def __lt__(self, other):
-        """Set an entity as the "source" role"""
-        if not isinstance(other, EntityReference):
-            return NotImplemented
-        return self.update_roles(**{SOURCE_ROLE_NAME: other})
-
-    def update_roles(self, **roles):
-        """
-        Update/add relation's roles.
-
-        Args:
-            roles:      A dictionary of role names and references to entities
-                        fulfilling those roles to update/add.
-
-        Returns:
-            Self.
-        """
-        assert isinstance(roles, dict)
-        assert all(isinstance(k, str) and isinstance(v, EntityReference)
-                   for k, v in roles.items())
-        new_roles = dict(self.roles)
-        new_roles.update({
-            name: (entity.type_name, entity.name)
-            for name, entity in roles.items()
-        })
-        new_roles = frozenset(new_roles.items())
-        self.graph._relation_types_roles_attrs[self.type_name][new_roles] = \
-            self.graph._relation_types_roles_attrs[self.type_name]. \
-            pop(self.roles)
-        self.roles = new_roles
-        return self
-
-    def update_attrs(self, **attrs):
-        """
-        Update/add relation's attributes.
-
-        Args:
-            attrs:  The attributes to update/add.
-
-        Returns:
-            Self.
-        """
-        assert isinstance(attrs, dict)
-        assert all(isinstance(k, str) and isinstance(v, ATTR_TYPES)
-                   for k, v in attrs.items())
-        self.graph._relation_types_roles_attrs[self.type_name][self.roles]. \
-            update(attrs)
-        return self
-
-
-class EntityTypeAccessor(TypeAccessor):
+class EntityTypeAccessor:
     """An accessor for a type of entity"""
-    def __call__(self, name: str, **attrs) -> EntityReference:
-        """
-        Access an entity of the type, with the specified name, and possibly
-        change its attributes.
 
-        Args:
-            name:   The name of the entity.
-            attrs:  The attributes of the entity to add/modify.
+    def __init__(self, graph: Graph, type_name: str):
+        """Initialize the entity type accessor"""
+        self.graph = graph
+        self.type_name = type_name
 
-        Returns:
-            The reference to the (updated) entity.
-        """
-        assert isinstance(name, str)
-        assert all(isinstance(k, str) for k in attrs)
-        ref = EntityReference(self.graph, self.type_name, name)
-        ref.update_attrs(**attrs)
-        return ref
+    def __getattr__(self, name: str) -> EntityReference:
+        """Access an entity with specified name"""
+        return EntityReference(self.graph, self.type_name, name)
+
+    def __getitem__(self, name: str) -> EntityReference:
+        """Access an entity with specified name"""
+        return EntityReference(self.graph, self.type_name, name)
 
 
-class EntityAccessor(DomainAccessor):
+class EntityDomainAccessor:
     """An accessor for all graph entities"""
-    type_accessor = EntityTypeAccessor
 
-    def __call__(self, name: str, **attrs) -> EntityReference:
+    def __init__(self, graph: Graph):
+        """Initialize the entity accessor"""
+        self.graph = graph
+
+    def __getattr__(self, type_name: str) -> EntityTypeAccessor:
+        """Access an entity type"""
+        return EntityTypeAccessor(self.graph, type_name)
+
+    def __getitem__(self, type_name: str) -> EntityTypeAccessor:
+        """Access an entity type"""
+        return EntityTypeAccessor(self.graph, type_name)
+
+
+class RelationTemplate:
+    """A template for a relation"""
+
+    def __init__(self, graph: Graph, type_name: str,
+                 roles: frozenset, attrs: dict):
         """
-        Access a typeless entity, with the specified name, and possibly change
-        its attributes.
+        Initialize a relation template.
 
         Args:
-            name:   The name of the entity.
-            attrs:  The attributes of the object to add/modify.
-
-        Returns:
-            The reference to the (updated) object.
+            graph:              The graph the relation belongs to.
+            type_name:          The name of the type of the relation.
+            roles:              A frozenset with tuples, two items each:
+                                * Role name
+                                * A tuple with entity's type name and name.
+            attrs:              A dictionary of attribute names and values.
         """
-        assert all(isinstance(k, str) for k in attrs)
-        return self[""](name, **attrs)
+        assert all(
+            isinstance(role, str) and
+            isinstance(entity, tuple) and len(entity) == 2 and
+            isinstance(entity[0], str) and isinstance(entity[1], str)
+            for role, entity in roles
+        )
+        assert all(
+            isinstance(k, str) and isinstance(v, ATTR_TYPES)
+            for k, v in attrs.items()
+        )
+        self.graph = graph
+        self.type_name = type_name
+        self.roles = roles
+        self.attrs = attrs
+        # Create/replace relation attributes
+        self.graph._relation_types_roles_attrs[self.type_name][self.roles] = \
+            attrs.copy()
 
-class RelationTypeAccessor(TypeAccessor):
-    """An accessor for a type of relation"""
-    def __call__(self, **attrs_and_roles) -> RelationReference:
+    def __rshift__(self, other_or_cont):
         """
-        Access a relation of the type, with the roles, and possibly change its
-        attributes.
+        Set (a container of) entities as the "target" role for the template
+        relation.
+        """
+        other_cont = other_or_cont \
+            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            else [other_or_cont]
+        for other in other_cont:
+            if isinstance(other, EntityReference):
+                self(**{TARGET_ROLE_NAME: other})
+            else:
+                return NotImplemented
+        return other_or_cont
+
+    def __rlshift__(self, other_or_cont):
+        """
+        Set (a container of) entities as the "target" role for the template
+        relation.
+        """
+        result_list = []
+        other_cont = other_or_cont \
+            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            else [other_or_cont]
+        for other in other_cont:
+            if isinstance(other, EntityReference):
+                result_list.append(self(**{TARGET_ROLE_NAME: other}))
+            else:
+                return NotImplemented
+        return type(other_cont)(result_list) \
+            if other_cont is other_or_cont \
+            else result_list[0]
+
+    def __lshift__(self, other_or_cont):
+        """
+        Set (a container of) entities as the "source" role for the template
+        relation.
+        """
+        other_cont = other_or_cont \
+            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            else [other_or_cont]
+        for other in other_cont:
+            if isinstance(other, EntityReference):
+                self(**{SOURCE_ROLE_NAME: other})
+            else:
+                return NotImplemented
+        return other_or_cont
+
+    def __rrshift__(self, other_or_cont):
+        """
+        Set (a container of) entities as the "source" role for the template
+        relation.
+        """
+        result_list = []
+        other_cont = other_or_cont \
+            if isinstance(other_or_cont, (set, frozenset, list, tuple)) \
+            else [other_or_cont]
+        for other in other_cont:
+            if isinstance(other, EntityReference):
+                result_list.append(self(**{SOURCE_ROLE_NAME: other}))
+            else:
+                return NotImplemented
+        return type(other_cont)(result_list) \
+            if other_cont is other_or_cont \
+            else result_list[0]
+
+    def __call__(self, **attrs_and_roles) -> 'RelationTemplate':
+        """
+        Create a new relation template (and a relation) from this one with
+        attributes and/or relations updated.
 
         Args:
-            attrs_and_roles:    A dictionary of attributes of the relation to
-                                add/modify, as well as roles to identify the
-                                relation by.
+            attrs_and_roles:    A dictionary of attribute names and values,
+                                and/or role names and entities to add/modify.
 
         Returns:
             The reference to the (updated) relation.
@@ -438,32 +418,42 @@ class RelationTypeAccessor(TypeAccessor):
             isinstance(v, (EntityReference,) + ATTR_TYPES)
             for k, v in attrs_and_roles.items()
         )
-        roles = {}
-        attrs = {}
+
+        # Create updated roles and attributes
+        roles = dict(self.roles)
+        attrs = self.attrs.copy()
         for key, value in attrs_and_roles.items():
-            (roles if isinstance(value, EntityReference)
-             else attrs)[key] = value
-        ref = RelationReference(self.graph, self.type_name, **roles)
-        ref.update_attrs(**attrs)
-        return ref
+            if isinstance(value, EntityReference):
+                if key in roles:
+                    raise Exception(
+                        "Attempting to change a relation template role"
+                    )
+                roles[key] = (value.type_name, value.name)
+            else:
+                attrs[key] = value
+        roles = frozenset(roles.items())
+
+        # If we're adding (not keeping or changing) roles
+        if roles > self.roles:
+            # Remove the attributes from the old roles
+            self.graph._relation_types_roles_attrs[self.type_name]. \
+                pop(self.roles, {})
+
+        # Create the new template (and relation)
+        return type(self)(self.graph, self.type_name, roles, attrs)
 
 
-class RelationAccessor(DomainAccessor):
+class RelationDomainAccessor:
     """An accessor for all graph relations"""
-    type_accessor = RelationTypeAccessor
 
-    def __call__(self, **attrs_and_roles) -> RelationReference:
-        """
-        Access a typeless relation, and possibly change
-        its attributes and/or roles.
+    def __init__(self, graph: Graph):
+        """Initialize the relation accessor"""
+        self.graph = graph
 
-        Args:
-            attrs_and_roles:    A dictionary of attributes of the relation to
-                                add/modify, as well as roles to identify the
-                                relation by.
+    def __getattr__(self, type_name: str) -> RelationTemplate:
+        """Create a relation template for a type"""
+        return RelationTemplate(self.graph, type_name, frozenset(), {})
 
-        Returns:
-            The reference to the (updated) object.
-        """
-        assert all(isinstance(k, str) for k in attrs_and_roles)
-        return self[""](**attrs_and_roles)
+    def __getitem__(self, type_name: str) -> RelationTemplate:
+        """Create a relation template for a type"""
+        return RelationTemplate(self.graph, type_name, frozenset(), {})
