@@ -129,19 +129,19 @@ class Graph:
                 self._relation_types_roles_attrs.items():
             for roles, attrs in roles_attrs.items():
                 roles_dict = dict(roles)
+                relation_attrs = dict(
+                    label=relation_type,
+                    knob_domain="relation",
+                    knob_type=relation_type,
+                    **{"knob_attr_" + n: str(v) for n, v in attrs.items()}
+                )
                 # If this is a simple relation (source->target)
                 if set(roles_dict) == {SOURCE_ROLE_NAME, TARGET_ROLE_NAME}:
                     # Create the relation edge
                     graph.edge(
                         repr(roles_dict[SOURCE_ROLE_NAME]),
                         repr(roles_dict[TARGET_ROLE_NAME]),
-                        label=relation_type,
-                        _attributes=dict(
-                            [("knob_domain", "relation"),
-                             ("knob_type", relation_type)] +
-                            [("knob_attr_" + n, str(v))
-                             for n, v in attrs.items()]
-                        )
+                        **relation_attrs
                     )
                 # Else this is a complex (non-binary) relation
                 else:
@@ -149,41 +149,18 @@ class Graph:
                     # Relation node name
                     name = repr(sorted_roles)
                     # Create the relation node
-                    graph.node(
-                        name, label=relation_type,
-                        _attributes=dict(
-                            [("shape", "diamond"),
-                             ("knob_domain", "relation"),
-                             ("knob_type", relation_type)] +
-                            [("knob_attr_" + n, v) for n, v in attrs.items()]
-                        )
-                    )
+                    graph.node(name, **relation_attrs, shape="diamond")
                     # Create the role edges
                     for role, entity in sorted_roles:
+                        edge_attrs = dict(knob_domain="role", knob_type=role)
                         if role == SOURCE_ROLE_NAME:
-                            graph.edge(
-                                repr(entity), name,
-                                _attributes=dict(
-                                    knob_domain="role",
-                                    knob_type=role
-                                )
-                            )
+                            graph.edge(repr(entity), name, **edge_attrs)
                         elif role == TARGET_ROLE_NAME:
-                            graph.edge(
-                                name, repr(entity),
-                                _attributes=dict(
-                                    knob_domain="role",
-                                    knob_type=role
-                                )
-                            )
+                            graph.edge(name, repr(entity), **edge_attrs)
                         else:
                             graph.edge(
                                 repr(entity), name, label=role,
-                                _attributes=dict(
-                                    style="dashed",
-                                    knob_domain="role",
-                                    knob_type=role
-                                )
+                                **edge_attrs, style="dashed"
                             )
 
     def render_graphviz(self):
