@@ -176,7 +176,51 @@ class Graph:
         return graph.source
 
 
-class EntityReference:
+class Object:
+    """An abstract graph object (entity or relation)"""
+
+
+def obj_or_cont_is_valid(obj_or_cont):
+    """
+    Check that an object or a (nested) container thereof is valid.
+
+    That is if the "obj_or_cont" is either an Object, or a (nested) container
+    thereof. Where "container" is one of "CONT_TYPES".
+
+    Args:
+        obj_or_cont:  The object (container) to check.
+
+    Returns:
+        True if the object (container) is valid, False otherwise.
+    """
+    if isinstance(obj_or_cont, Object):
+        return True
+    if isinstance(obj_or_cont, CONT_TYPES):
+        return all(obj_or_cont_is_valid(sub_obj_or_cont)
+                   for sub_obj_or_cont in obj_or_cont)
+    return False
+
+
+def obj_or_cont_iter(obj_or_cont):
+    """
+    Create a generator returning the Object instances for an Object instance
+    or a (nested) container thereof, as defined by obj_or_cont_is_valid().
+
+    Args:
+        obj_or_cont:  The object (container) to iterate over.
+
+    Returns:
+        A generator returning Object instances.
+    """
+    assert obj_or_cont_is_valid(obj_or_cont)
+    if isinstance(obj_or_cont, Object):
+        yield obj_or_cont
+    if isinstance(obj_or_cont, CONT_TYPES):
+        for sub_obj_or_cont in obj_or_cont:
+            yield from obj_or_cont_iter(sub_obj_or_cont)
+
+
+class EntityReference(Object):
     """An entity reference"""
 
     def __init__(self, graph: Graph, type_name: str, name: str):
@@ -197,63 +241,57 @@ class EntityReference:
             self.type_name == other.type_name and \
             self.name == other.name
 
-    def __rshift__(self, other_or_cont):
+    def __rshift__(self, obj_or_cont):
         """
         Set yourself as the "source" role of (a container of) (implicit
         typeless) relations.
         """
+        if not obj_or_cont_is_valid(obj_or_cont):
+            return NotImplemented
         result_list = []
-        other_cont = other_or_cont \
-            if isinstance(other_or_cont, CONT_TYPES) \
-            else [other_or_cont]
-        for other in other_cont:
-            if isinstance(other, EntityReference):
+        for obj in obj_or_cont_iter(obj_or_cont):
+            if isinstance(obj, EntityReference):
                 self.graph.relations[""](**{SOURCE_ROLE_NAME: self,
-                                            TARGET_ROLE_NAME: other})
-            elif isinstance(other, RelationTemplate):
-                other = other(**{SOURCE_ROLE_NAME: self})
+                                            TARGET_ROLE_NAME: obj})
+            elif isinstance(obj, RelationTemplate):
+                obj = obj(**{SOURCE_ROLE_NAME: self})
             else:
                 return NotImplemented
-            result_list.append(other)
-        return type(other_cont)(result_list) \
-            if other_cont is other_or_cont \
-            else result_list[0]
+            result_list.append(obj)
+        return result_list if len(result_list) > 1 else result_list[0]
 
-    def __rlshift__(self, other_or_cont):
+    def __rlshift__(self, obj_or_cont):
         """
         Set yourself as the "source" role of (a container of) (implicit
         typeless) relations.
         """
-        return self.__rshift__(other_or_cont)
+        return self.__rshift__(obj_or_cont)
 
-    def __lshift__(self, other_or_cont):
+    def __lshift__(self, obj_or_cont):
         """
         Set yourself as the "target" role of (a container of) (implicit
         typeless) relations.
         """
+        if not obj_or_cont_is_valid(obj_or_cont):
+            return NotImplemented
         result_list = []
-        other_cont = other_or_cont \
-            if isinstance(other_or_cont, CONT_TYPES) \
-            else [other_or_cont]
-        for other in other_cont:
-            if isinstance(other, EntityReference):
+        for obj in obj_or_cont_iter(obj_or_cont):
+            if isinstance(obj, EntityReference):
                 self.graph.relations[""](**{TARGET_ROLE_NAME: self,
-                                            SOURCE_ROLE_NAME: other})
-            elif isinstance(other, RelationTemplate):
-                other = other(**{TARGET_ROLE_NAME: self})
+                                            SOURCE_ROLE_NAME: obj})
+            elif isinstance(obj, RelationTemplate):
+                obj = obj(**{TARGET_ROLE_NAME: self})
             else:
                 return NotImplemented
-            result_list.append(other)
-        return type(other_cont)(result_list) \
-            if other_cont is other_or_cont \
-            else result_list[0]
+            result_list.append(obj)
+        return result_list if len(result_list) > 1 else result_list[0]
 
-    def __rrshift__(self, other_or_cont):
+    def __rrshift__(self, obj_or_cont):
         """
         Set yourself as the "target" role of (a container of) (implicit
         typeless) relations.
         """
-        return self.__lshift__(other_or_cont)
+        return self.__lshift__(obj_or_cont)
 
     def __call__(self, **attrs) -> 'EntityReference':
         """
@@ -305,7 +343,7 @@ class EntityDomainAccessor:
         return EntityTypeAccessor(self.graph, type_name)
 
 
-class RelationTemplate:
+class RelationTemplate(Object):
     """A template for a relation"""
 
     def relation_roles_iter(self, relation_roles=frozenset()):
@@ -378,54 +416,42 @@ class RelationTemplate:
             self.graph._relation_types_roles_attrs \
                 [self.type_name][relation_roles] = self.attrs.copy()
 
-    def __rshift__(self, other_or_cont):
+    def __rshift__(self, obj_or_cont):
         """
         Set (a container of) entities as the "target" role for the template
         relation.
         """
-        if isinstance(other_or_cont, EntityReference) or \
-                isinstance(other_or_cont, CONT_TYPES) and \
-                all(isinstance(other, EntityReference)
-                    for other in other_or_cont):
-            self(**{TARGET_ROLE_NAME: other_or_cont})
-            return other_or_cont
+        if obj_or_cont_is_valid(obj_or_cont):
+            self(**{TARGET_ROLE_NAME: obj_or_cont})
+            return obj_or_cont
         return NotImplemented
 
-    def __rlshift__(self, other_or_cont):
+    def __rlshift__(self, obj_or_cont):
         """
         Set (a container of) entities as the "target" role for the template
         relation.
         """
-        if isinstance(other_or_cont, EntityReference) or \
-                isinstance(other_or_cont, CONT_TYPES) and \
-                all(isinstance(other, EntityReference)
-                    for other in other_or_cont):
-            return self(**{TARGET_ROLE_NAME: other_or_cont})
+        if obj_or_cont_is_valid(obj_or_cont):
+            return self(**{TARGET_ROLE_NAME: obj_or_cont})
         return NotImplemented
 
-    def __lshift__(self, other_or_cont):
+    def __lshift__(self, obj_or_cont):
         """
         Set (a container of) entities as the "source" role for the template
         relation.
         """
-        if isinstance(other_or_cont, EntityReference) or \
-                isinstance(other_or_cont, CONT_TYPES) and \
-                all(isinstance(other, EntityReference)
-                    for other in other_or_cont):
-            self(**{SOURCE_ROLE_NAME: other_or_cont})
-            return other_or_cont
+        if obj_or_cont_is_valid(obj_or_cont):
+            self(**{SOURCE_ROLE_NAME: obj_or_cont})
+            return obj_or_cont
         return NotImplemented
 
-    def __rrshift__(self, other_or_cont):
+    def __rrshift__(self, obj_or_cont):
         """
         Set (a container of) entities as the "source" role for the template
         relation.
         """
-        if isinstance(other_or_cont, EntityReference) or \
-                isinstance(other_or_cont, CONT_TYPES) and \
-                all(isinstance(other, EntityReference)
-                    for other in other_or_cont):
-            return self(**{SOURCE_ROLE_NAME: other_or_cont})
+        if obj_or_cont_is_valid(obj_or_cont):
+            return self(**{SOURCE_ROLE_NAME: obj_or_cont})
         return NotImplemented
 
     def __call__(self, **attrs_and_roles) -> 'RelationTemplate':
@@ -442,11 +468,8 @@ class RelationTemplate:
             The reference to the (updated) relation.
         """
         assert all(
-            isinstance(k, str) and (
-                isinstance(v, (EntityReference,) + ATTR_TYPES) or
-                isinstance(v, CONT_TYPES) and
-                all(isinstance(e, EntityReference) for e in v)
-            )
+            isinstance(k, str) and
+            (isinstance(v, ATTR_TYPES) or obj_or_cont_is_valid(v))
             for k, v in attrs_and_roles.items()
         )
 
@@ -454,18 +477,14 @@ class RelationTemplate:
         roles = self.roles.copy()
         attrs = self.attrs.copy()
         for key, value in attrs_and_roles.items():
-            if isinstance(value, EntityReference):
-                value = (value,)
-            if isinstance(value, CONT_TYPES):
-                if len(value) == 0:
-                    continue
-                if key not in roles:
-                    roles[key] = tuple()
-                roles[key] += tuple(
-                    (entity.type_name, entity.name) for entity in value
-                )
-            else:
+            if isinstance(value, ATTR_TYPES):
                 attrs[key] = value
+            else:
+                for obj in obj_or_cont_iter(value):
+                    assert isinstance(obj, EntityReference)
+                    if key not in roles:
+                        roles[key] = tuple()
+                    roles[key] += ((obj.type_name, obj.name),)
 
         # If we're adding new roles
         if set(roles) > set(self.roles):
