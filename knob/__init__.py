@@ -97,12 +97,18 @@ class Graph:
         Args:
             graph:  The graphviz graph to render entities into.
         """
+        def trim(s):
+            return s[:61] + "..." if isinstance(s, str) and len(s) > 64 else s
+
         for entity_type, names_attrs in \
                 self._entity_types_names_attrs.items():
             for name, attrs in names_attrs.items():
                 graph.node(
                     repr((entity_type, name)),
-                    label=f"{entity_type}:\n{name}" if entity_type else name,
+                    label="\n".join(
+                        [f"{entity_type}:\n{name}" if entity_type else name] +
+                        [f"{n}={trim(v)!r}" for n, v in attrs.items()]
+                    ),
                     _attributes=dict(
                         [("shape", "box"),
                          ("knob_domain", "entity"),
