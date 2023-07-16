@@ -97,54 +97,6 @@ digraph {
 }
 """
 
-def test_graphviz_arc_with_set(g, n):
-    """Check rendering of arc connected to a set into graphviz"""
-    n.A >> {n.B, n.C}
-    assert g.render_graphviz() in (
-        """\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'C')" [label=C knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'B')" [label="" knob_domain=relation knob_type=""]
-\t"('', 'A')" -> "('', 'C')" [label="" knob_domain=relation knob_type=""]
-}
-""",
-        """\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'C')" [label=C knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'C')" [label="" knob_domain=relation knob_type=""]
-\t"('', 'A')" -> "('', 'B')" [label="" knob_domain=relation knob_type=""]
-}
-"""
-    )
-
-def test_graphviz_arc_with_frozenset(g, n):
-    """Check rendering of arc connected to a frozenset into graphviz"""
-    n.A >> frozenset((n.B, n.C))
-    assert g.render_graphviz() in (
-        """\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'C')" [label=C knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'B')" [label="" knob_domain=relation knob_type=""]
-\t"('', 'A')" -> "('', 'C')" [label="" knob_domain=relation knob_type=""]
-}
-""",
-        """\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'C')" [label=C knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'C')" [label="" knob_domain=relation knob_type=""]
-\t"('', 'A')" -> "('', 'B')" [label="" knob_domain=relation knob_type=""]
-}
-"""
-    )
-
 def test_graphviz_arc_with_list(g, n):
     """Check rendering of arc connected to a list into graphviz"""
     n.A >> [n.B, n.C]
@@ -231,48 +183,6 @@ digraph {
 \t"('', 'A')" -> "('', 'B')" [label=Y knob_domain=relation knob_type=Y]
 }
 """
-
-def test_graphviz_binary_relation_set(g, n, r):
-    """Check binary relation set rendering into graphviz"""
-    n.A >> {r.X, r.Y} >> n.B
-    assert g.render_graphviz() in ("""\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'B')" [label=X knob_domain=relation knob_type=X]
-\t"('', 'A')" -> "('', 'B')" [label=Y knob_domain=relation knob_type=Y]
-}
-""",
-        """\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'B')" [label=Y knob_domain=relation knob_type=Y]
-\t"('', 'A')" -> "('', 'B')" [label=X knob_domain=relation knob_type=X]
-}
-"""
-    )
-
-def test_graphviz_binary_relation_frozenset(g, n, r):
-    """Check binary relation frozenset rendering into graphviz"""
-    n.A >> frozenset((r.X, r.Y)) >> n.B
-    assert g.render_graphviz() in ("""\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'B')" [label=X knob_domain=relation knob_type=X]
-\t"('', 'A')" -> "('', 'B')" [label=Y knob_domain=relation knob_type=Y]
-}
-""",
-        """\
-digraph {
-\t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
-\t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"('', 'A')" -> "('', 'B')" [label=Y knob_domain=relation knob_type=Y]
-\t"('', 'A')" -> "('', 'B')" [label=X knob_domain=relation knob_type=X]
-}
-"""
-    )
 
 def test_graphviz_binary_relation_entity_list_source(g, n, r):
     """

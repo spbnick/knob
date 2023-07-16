@@ -69,7 +69,7 @@ import graphviz
 ATTR_TYPES = (str, bool, int, float)
 
 # Accepted entity/relation container types (must be a tuple of types)
-CONT_TYPES = (set, frozenset, list, tuple)
+CONT_TYPES = (list, tuple)
 
 # The name of the source role
 SOURCE_ROLE_NAME = "source"
