@@ -343,68 +343,84 @@ digraph {
 \t"('', 'F')" [label=F knob_domain=entity knob_type="" shape=box]
 \t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
--> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
--> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
--> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'C')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'A')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'E')))" -> \
+"('', 'E')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
--> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
--> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
--> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'C')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'A')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'C')), ('source', ('', 'A')), ('target', ('', 'F')))" -> \
+"('', 'F')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
--> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
--> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
--> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'C')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'B')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'E')))" -> \
+"('', 'E')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
--> "('', 'C')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
--> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
--> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'C')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'B')" -> \
+"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'C')), ('source', ('', 'B')), ('target', ('', 'F')))" -> \
+"('', 'F')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
--> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
--> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
--> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'D')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'A')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'E')))" -> \
+"('', 'E')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
--> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
--> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
--> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'D')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'A')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'D')), ('source', ('', 'A')), ('target', ('', 'F')))" -> \
+"('', 'F')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
--> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
--> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
--> "('', 'E')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'D')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'B')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'E')))" -> \
+"('', 'E')" [knob_domain=role knob_type=target]
 \t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
 [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
--> "('', 'D')" [label=middle knob_domain=role knob_type=middle style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
--> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
--> "('', 'F')" [label=target knob_domain=role knob_type=target style=dashed]
+\t"('', 'D')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+[label=middle knob_domain=role knob_type=middle style=dashed]
+\t"('', 'B')" -> \
+"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" \
+[knob_domain=role knob_type=source]
+\t"(('middle', ('', 'D')), ('source', ('', 'B')), ('target', ('', 'F')))" -> \
+"('', 'F')" [knob_domain=role knob_type=target]
 }
 """
 
@@ -415,10 +431,14 @@ def test_graphviz_binary_relation_conflict(g, n, r):
 digraph {
 \t"('', 'A')" [label=A knob_domain=entity knob_type="" shape=box]
 \t"('', 'B')" [label=B knob_domain=entity knob_type="" shape=box]
-\t"(('source', ('', 'A')),)" [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('source', ('', 'A')),)" -> "('', 'A')" [label=source knob_domain=role knob_type=source style=dashed]
-\t"(('source', ('', 'B')),)" [label=X knob_domain=relation knob_type=X shape=diamond]
-\t"(('source', ('', 'B')),)" -> "('', 'B')" [label=source knob_domain=role knob_type=source style=dashed]
+\t"(('source', ('', 'A')),)" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"('', 'A')" -> "(('source', ('', 'A')),)" \
+[knob_domain=role knob_type=source]
+\t"(('source', ('', 'B')),)" \
+[label=X knob_domain=relation knob_type=X shape=diamond]
+\t"('', 'B')" -> "(('source', ('', 'B')),)" \
+[knob_domain=role knob_type=source]
 }
 """
 
