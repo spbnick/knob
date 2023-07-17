@@ -479,12 +479,12 @@ class RelationTemplate(Object):
         for key, value in attrs_and_roles.items():
             if isinstance(value, ATTR_TYPES):
                 attrs[key] = value
-            else:
-                for obj in obj_or_cont_iter(value):
-                    assert isinstance(obj, EntityReference)
-                    if key not in roles:
-                        roles[key] = tuple()
-                    roles[key] += ((obj.type_name, obj.name),)
+                continue
+            for obj in obj_or_cont_iter(value):
+                assert isinstance(obj, EntityReference)
+                if key not in roles:
+                    roles[key] = tuple()
+                roles[key] += ((obj.type_name, obj.name),)
 
         # If we're adding new roles
         if set(roles) > set(self.roles):
