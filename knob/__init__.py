@@ -481,7 +481,8 @@ class RelationTemplate(Object):
                 attrs[key] = value
                 continue
             for obj in obj_or_cont_iter(value):
-                assert isinstance(obj, EntityReference)
+                assert isinstance(obj, EntityReference), \
+                       f"{obj!r} is not an entity reference"
                 if key not in roles:
                     roles[key] = tuple()
                 roles[key] += ((obj.type_name, obj.name),)
