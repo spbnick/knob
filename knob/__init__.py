@@ -265,7 +265,8 @@ class EntityReference(Object):
         Set yourself as the "source" role of (a container of) (implicit
         typeless) relations.
         """
-        return self.__rshift__(obj_or_cont)
+        self.__rshift__(obj_or_cont)
+        return self
 
     def __lshift__(self, obj_or_cont):
         """
@@ -291,7 +292,8 @@ class EntityReference(Object):
         Set yourself as the "target" role of (a container of) (implicit
         typeless) relations.
         """
-        return self.__lshift__(obj_or_cont)
+        self.__lshift__(obj_or_cont)
+        return self
 
     def __call__(self, **attrs) -> 'EntityReference':
         """
