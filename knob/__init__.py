@@ -89,6 +89,8 @@ class Graph:
             defaultdict(lambda: defaultdict(dict))
         self.entities = EntityDomainAccessor(self)
         self.relations = RelationDomainAccessor(self)
+        self.entity_patterns = EntityTypePatternAccessor(self)
+        self.relation_patterns = RelationPatternAccessor(self)
 
     def _render_graphviz_entities(self, graph):
         """
@@ -514,3 +516,436 @@ class RelationDomainAccessor:
     def __getitem__(self, type_name: str) -> RelationTemplate:
         """Create a relation template for a type"""
         return RelationTemplate(self.graph, type_name, {}, {})
+
+
+class ValuePattern:
+    """An abstract value pattern"""
+
+    def matches(self, value):
+        """Check if the pattern matches a value"""
+        raise NotImplementedError
+
+    def matching(self, values):
+        """Produce an iterator returning matching values from another one"""
+        for value in values:
+            if self.matches(value):
+                yield value
+
+    def is_enumerable(self):
+        """Check if the pattern matches enumerable values"""
+        raise NotImplementedError
+
+    def enumerate(self):
+        """Produce an iterator returning all matching values, if enumerable"""
+        raise NotImplementedError
+
+
+class EmptyPattern(ValuePattern):
+    """A value pattern matching nothing"""
+    def matches(self, value):
+        return False
+
+    def is_enumerable(self):
+        return True
+
+    def enumerate(self):
+        iter(tuple())
+
+
+# The pattern that matches nothing
+EMPTY_PATTERN = EmptyPattern()
+
+
+class UniversalPattern(ValuePattern):
+    """A value pattern matching everything"""
+    def matches(self, value):
+        return True
+
+    def is_enumerable(self):
+        return False
+
+
+# The pattern that matches everything
+UNIVERSAL_PATTERN = UniversalPattern()
+
+
+class StringPattern(ValuePattern):
+    """A string value pattern"""
+
+    def __init__(self, pattern: str):
+        self.pattern = pattern
+
+    def matches(self, value):
+        return isinstance(value, str) and self.pattern == value
+
+    def is_enumerable(self):
+        return True
+
+    def enumerate(self):
+        yield self.pattern
+
+class RegexPattern(ValuePattern):
+    """A regular expression pattern matching string values"""
+
+    def __init__(self, pattern: re.Pattern):
+        self.pattern = pattern
+
+    def matches(self, value):
+        return isinstance(value, str) and self.pattern.fullmatch(value)
+
+    def is_enumerable(self):
+        return False
+
+
+class MultiPattern(ValuePattern):
+    """An abstract pattern matching multiple other patterns"""
+
+    def __init__(self, patterns: list[ValuePattern]):
+        self.patterns = patterns
+
+    def is_enumerable(self):
+        return all(pattern.is_enumerable() for pattern in self.patterns)
+
+
+class OrPattern(MultiPattern):
+    """A pattern matching one of a list of other patterns"""
+
+    def matches(self, value):
+        for pattern in self.patterns:
+            if pattern.matches(value):
+                return True
+        return False
+
+    def enumerate(self):
+        for pattern in self.patterns:
+            yield from pattern.enumerate()
+
+
+class AndPattern(MultiPattern):
+    """A pattern matching all patterns in a list"""
+
+    def matches(self, value):
+        for pattern in self.patterns:
+            if not pattern.matches(value):
+                return False
+        return True
+
+    def enumerate(self):
+        # Python, y u no have the universal set?
+        values = None
+        # TODO Make order predictable (e.g. preserve it)
+        for pattern in self.patterns:
+            subvalues = set(pattern.enumerate())
+            if values is None:
+                values = subvalues
+            else:
+                values &= subvalues
+        return iter(values or set())
+
+
+class DictPattern(ValuePattern):
+    """A pattern matching a dictionary"""
+
+    def __init__(self,
+                 required=None: None | dict[str, ValuePattern],
+                 optional=None: None | dict[str, ValuePattern]):
+        """
+        Initialize the dictionary pattern.
+
+        Args:
+            required:   A dictionary of key names and value patterns matching
+                        entries that must appear in the dictionary.
+                        Can be None, meaning there are no required entries,
+                        which is equivalent to an empty dictionary.
+            optional:   A dictionary of key names and value patterns matching
+                        entries that may appear in the dictionary.
+                        Can be None, meaning any entries beside the required
+                        ones are accepted.
+        """
+        if required is None:
+            required = dict()
+        self.required = required
+        self.optional = optional
+
+    def matches(self, dictionary):
+        if not isinstance(dictionary, dict):
+            return False
+        remaining_dictionary = dictionary.copy()
+        for key, value_pattern in self.required.items():
+            if key in dictionary:
+                if value_pattern.matches(dictionary[key])
+                    remaining_dictionary.pop(key, None)
+                    continue
+            return False
+        if self.optional is not None:
+            for key, value in remaining_dictionary.items():
+                if not self.optional.get(key, EMPTY_PATTERN).matches(value):
+                    return False
+        return True
+
+
+class OperandPattern:
+    """A graph expression operand pattern"""
+
+    def __init__(self, graph: Graph):
+        """
+        Initialize the operand pattern.
+
+        Args:
+            graph: The graph the matched operands belong to.
+        """
+        self.graph = graph
+
+    def is_enumerable(self):
+        """Check if the pattern matches enumerable operands"""
+        raise NotImplementedError
+
+class ElementPattern(Operand):
+    """An abstract element (relation or entity) pattern"""
+
+    def __neg__(self):
+        """Create a subgraph pattern matching this element pattern"""
+        return GraphPattern(
+            self.graph,
+            elements={self: False},
+            left=self,
+            right=self
+        )
+
+    def __invert__(self):
+        """
+        Create a subgraph pattern creating any elements this (enumerable)
+        pattern will match, if not found.
+        """
+        assert self.is_enumerable()
+        return GraphPattern(
+            self.graph,
+            elements={self: None},
+            left=self,
+            right=self
+        )
+
+    def __pos__(self):
+        """
+        Create a subgraph pattern creating any elements this (enumerable)
+        pattern will match, unconditionally.
+        """
+        assert self.is_enumerable()
+        return GraphPattern(
+            self.graph,
+            elements={self: True},
+            left=self,
+            right=self
+        )
+
+class EntityPattern(ElementPattern):
+    """A graph entity pattern"""
+
+    def __init__(self,
+                 graph: Graph,
+                 type_name_pattern: ValuePattern,
+                 name_pattern: ValuePattern,
+                 attrs_pattern=UNIVERSAL_PATTERN: ValuePattern):
+        """
+        Initialize the entity pattern.
+
+        Args:
+            graph:              The graph the matched entities belong to.
+            type_name_pattern:  The pattern for the entity type name.
+            name_pattern:       The pattern for the entity name.
+            attrs_pattern:      The pattern for the attribute dictionary.
+        """
+        self.graph = graph
+        self.type_name_pattern = type_name_pattern
+        self.name_pattern = name_pattern
+        self.attrs_pattern = attrs_pattern
+
+    def __rshift__(self, opd):
+        """
+        Create a graph pattern matching an (implicit) relation of this entity
+        pattern (as the "source" role) with an operand pattern.
+        """
+        if not instance(opd, OperandPattern):
+            return NotImplemented
+        if isinstance(opd, EntityPattern):
+            elements = {
+                self: False,
+                self.graph.relations[""](**{SOURCE_ROLE_NAME: self,
+                                            TARGET_ROLE_NAME: opd}): False
+            }
+        elif isinstance(opd, RelationPattern):
+            elements = {
+                self: False,
+                opd(**{SOURCE_ROLE_NAME: self}): False
+            }
+        else:
+            return NotImplemented
+        # TODO EXPLODE AND MERGE GRAPHS!
+        return GraphPattern(
+            self.graph,
+            elements=elements,
+            left=self,
+            right=opd
+        )
+
+
+class RelationPattern(ElementPattern):
+    """A graph relation pattern"""
+
+    def __init__(self,
+                 graph: Graph,
+                 type_name_pattern: ValuePattern,
+                 attrs_pattern=UNIVERSAL_PATTERN: ValuePattern,
+                 role_patterns=None: None | dict[str, EntityPattern]):
+        """
+        Initialize the relation pattern.
+
+        Args:
+            graph:              The graph the matched relations belong to.
+            type_name_pattern:  The pattern for the relation type name.
+            attrs_pattern:      The pattern for the attribute dictionary.
+            role_patterns:      A dictionary of role names and entity patterns
+                                that must be present in the relation.
+                                None, if roles should be ignored.
+        """
+        self.graph = graph
+        self.type_name_pattern = type_name_pattern
+        self.attrs_pattern = attrs_pattern
+        self.role_patterns = role_patterns
+
+
+class GraphPattern(Operand):
+    """A (sub)graph pattern"""
+
+    def __init__(self,
+                 graph: Graph,
+                 elements: dict[ElementPattern, None | bool],
+                 left: ElementPattern,
+                 right: ElementPattern):
+        """
+        Initialize the graph pattern.
+
+        Args:
+            graph:      The supergraph of the graph this pattern is matching.
+                        All supplied elements must reference this graph.
+            elements:   A dictionary of patterns matching elements
+                        (entities or relations) belonging to the subgraph, and
+                        one of the three values:
+                        * False, if the element pattern should be matched.
+                        * None, if any element matching the (enumerable)
+                          pattern should be created, if they don't exist.
+                        * True, if all elements matching the (enumerable)
+                          pattern should be created unconditionally.
+                        Roles in any relation patterns contained in this
+                        dictionary can only reference entity patterns from the
+                        same dictionary. All elements in this dictionary must
+                        reference the supplied graph.
+            left:       An element pattern considered to be the "leftmost" in
+                        this subgraph. Must exist in the element dictionary.
+            right:      An element considered to be the "rightmost" in
+                        this subgraph. Must exist in the element dictionary.
+        """
+        assert all(e.graph is graph for e in elements)
+        entities = {
+            e: c
+            for e, c in elements.items() if isinstance(e, EntityPattern)
+        }
+        relations = {
+            e: c
+            for e, c in elements.items() if isinstance(e, RelationPattern)
+        }
+        assert set(entities) >= {
+            entity
+            for relation in relations
+            for entity in relation.role_patterns.values()
+        }
+        assert left in elements
+        assert right in elements
+        self.graph = graph
+        self.elements = elements
+        self.entities = entities
+        self.relations = relations
+        self.left = left
+        self.right = right
+
+    def __neg__(self):
+        """Mark the subgraph pattern to be matched"""
+        return GraphPattern(
+            self.graph,
+            elements={e: False for e in self.elements},
+            left=self.left,
+            right=self.right
+        )
+
+    def __invert__(self):
+        """Mark the subgraph pattern to be created, if not matched"""
+        return GraphPattern(
+            self.graph,
+            elements={e: None for e in self.elements},
+            left=self.left,
+            right=self.right
+        )
+
+    def __pos__(self):
+        """Mark the subgraph pattern to be created, not matched"""
+        return GraphPattern(
+            self.graph,
+            elements={e: True for e in self.elements},
+            left=self.left,
+            right=self.right
+        )
+
+
+
+class EntityPatternTypeAccessor:
+    """An accessor for entity patterns with a particular type"""
+
+    def __init__(self, graph: Graph, type_name: str):
+        """Initialize the entity pattern accessor"""
+        self.graph = graph
+        self.type_name = type_name
+        self.type_pattern = StringPattern(self.type_name)
+
+    def __getattr__(self, name: str) -> EntityPattern:
+        """Create a pattern with the accessor's type and specified name"""
+        return EntityPattern(self.graph,
+                             self.type_pattern,
+                             StringPattern(name))
+
+    def __getitem__(self, name: str) -> EntityPattern:
+        """Create a pattern with the accessor's type and specified name"""
+        return EntityPattern(self.graph,
+                             self.type_pattern,
+                             StringPattern(name))
+
+
+class EntityPatternAccessor:
+    """An accessor for entity patterns"""
+
+    def __init__(self, graph: Graph):
+        """Initialize the entity pattern accessor"""
+        self.graph = graph
+
+    def __getattr__(self, type_name: str) -> EntityPatternTypeAccessor:
+        """Access entity patterns with a particular type"""
+        return EntityPatternTypeAccessor(self.graph, type_name)
+
+    def __getitem__(self, type_name: str) -> EntityPatternTypeAccessor:
+        """Access entity patterns with a particular type"""
+        return EntityPatternTypeAccessor(self.graph, type_name)
+
+
+class RelationPatternAccessor:
+    """An accessor for relation patterns"""
+
+    def __init__(self, graph: Graph):
+        """Initialize the relation pattern accessor"""
+        self.graph = graph
+
+    def __getattr__(self, type_name: str) -> RelationTemplate:
+        """Create a relation pattern for a type"""
+        return RelationPattern(self.graph, StringPattern(type_name))
+
+    def __getitem__(self, type_name: str) -> RelationTemplate:
+        """Create a relation pattern for a type"""
+        return RelationPattern(self.graph, StringPattern(type_name))

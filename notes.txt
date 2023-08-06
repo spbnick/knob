@@ -67,3 +67,491 @@ Can we just always pass around a relation template and create a relation each
 time its roles are added or changed? And then remove all relations which are
 subsets of the one being created from the graph? Because e.g. in Graphviz it's
 not possible to remove roles, only to add?
+
+---
+TODO: Format entities and relations nicely with HTML. Fit more data.
+
+What do we do with the scope problem? Node names (and types) are global. Yet
+e.g. a bitfield with the same name can be utilized in multiple packet types
+and have different meanings (e.g. "hash").
+
+It looks like we have to stop identifying nodes by name (and type), and allow
+creating duplicates. Then support matching nodes by what they're connected to.
+And finally make node creation explicit, to separate it from matching.
+
+An unary operator in front of the node reference could work for the latter,
+something like `~` or maybe even `+`.
+
+However, since our evaluation order is left-to-right, only everything on the
+left of the node getting created would be considered a pattern, and everything
+on the right would be a modification.
+
+I.e., this:
+
+n.A >> n.B >> +n.C >> n.D >> n.E
+
+Would create node C and connect it to the node B, which is already connected
+to node A. Then node D would get connected to node C, and node E to node D.
+
+What we actually want is to have the node C created and connected to node B,
+which is connected to A, and to node D, which is connected to E.
+
+Could we do this using separate operators for creating vs. matching edges?
+
+E.g. use << and >> for matching, and < and > for creating? Would we hit the
+problem with Python combining the comparison operators again?
+
+I.e. express what we need above as:
+
+n.A >> n.B > +n.C > n.D >> n.E
+
+Actually, we would need to flip the two nodes above:
+
+n.A >> n.B > +n.C > n.E << n.D
+
+because of the >> operator always returning the right operand.
+
+And *that* doesn't look intuitive *at all*.
+
+It looks like we need to do actual matching/creating after the whole
+expression has evaluated, not as we're building it.
+
+So something like:
+
+graph.update(
+    n.A >> [n.B, n.Beta] >> +n.C >> n.D << n.E << +n.F,
+    n.A >> n.F
+)
+
+We're still missing a way to differente existing edges, and edges that we want
+to create.
+
+Could we perhaps use the < and >, despite the "chaining" "feature"? We can
+perhaps create a new instance of an entity reference each time we index the
+accessor, and then update it with every comparison, instead of returning a new
+one. We could have separate, different classes for operands, always return the
+right side, so at the end of the expression we get the complete pattern.
+
+graph.update(
+    n.A > [n.B, n.Beta] > +n.C > n.D < n.E << +n.F,
+    n.A >> n.F
+)
+
+Or perhaps:
+
+with graph.add():
+    n.A > [n.B, +n.Beta] >> +n.C >> n.D < n.E << +n.F
+    n.A >> n.F
+
+So, we could have a class for a subgraph pattern which describes how to find
+it. Some entities and relations in it can be marked for action, handling which
+would depend on the committing operation:
+* adding objects if nothing matches the pattern
+    - same problem as with conditional removal below
+* adding objects unconditionally
+* removing objects if they exist, do nothing if they don't
+    - this might be difficult
+    - what if only half of the marked objects exist?
+    - what if both halves of marked objects exist, but not together?
+* removing objects only if they exist, abort if they don't
+    - the whole pattern must match, including the marked objects
+
+Wait, we can make this easier, if we always request the complete pattern to
+match. So, the operations become:
+
+* try_add
+    - If the complete pattern matches, finish
+    - fall through to "add"
+* add
+    - First find objects matching each pattern between marked objects (abort
+      if not found), then add the marked objects
+* try_del
+    - If the complete pattern does not match, finish
+    - fall through to "del"
+* del
+    - Find objects matching the complete pattern (or reuse the result of
+      "try_del", if falling through)
+    - Remove objects matching the marked patterns from it
+
+Would this be actually useful? Hmmm... perhaps? We gotta try.
+
+Actually, not really. The separate try_del operation doesn't make sense at
+all.
+
+Let's try again:
+
+* try_add
+    - Find objects matching each pattern between marked objects. Abort
+      if not found.
+    - fall through to "add"
+* add
+    - First find objects matching each pattern between marked objects (abort
+      if not found), then add the marked objects
+* try_del
+    - If the complete pattern does not match, finish
+    - fall through to "del"
+* del
+    - Find objects matching the complete pattern (or reuse the result of
+      "try_del", if falling through)
+    - Remove objects matching the marked patterns from it
+
+---
+Actually, if we limit our support to just adding entities and relations, then
+we can avoid having to explicitly terminate the pattern/modification building.
+
+We could just keep modifying the graph as the pattern is being read in, same
+as we do with relations/entities now. I.e. on each operation take what's on
+the left, remove its effects from the graph, create the new pattern according
+to the operation, and add its effects to the graph. Then after each operation
+we would have an up-to-date graph, including the last one in the statement,
+and we would be OK (as long as we don't need to support atomic operations).
+
+This would mean that patterns matching nothing wouldn't raise an error until
+we actually reference them for a sub- or super- pattern. That is until we try
+to use them in an expression. Because the creation operation ('+') takes a
+pattern, which has to be instantiated first, and therefore can be invalid.
+
+Maaaybe it's not so bad.
+---
+
+So, let's say an entity pattern has a type pattern, a name pattern
+...
+    Do we even need names now? It would be nice to have a name assigned to an
+    entity easily. So perhaps yes. Even though they're no longer unique.
+...
+and an attribute dictionary pattern, which has string patterns for attribute
+names, and one of a variety of patterns for values.
+
+And then we can have a relation patterns, which have a type pattern, and a
+role dictionary pattern, which has string patterns for role names, and
+references to entity patterns for whatever should fulfill the roles.
+
+Next, those should be organized into a subgraph pattern, which stores a set of
+entity patterns and a set of relation patterns, and a reference to the
+rightmost entity or relation pattern, for use in the next operation.
+
+Now, how do we go about matching that subgraph?
+
+How about we first match every entity pattern, and record a set of entities
+for each? Then we match every relation pattern, checking that they have the
+required roles and the pattern references in those roles match at least one
+entity? This would be brute force, but would it actually accomplish what we
+want? Looks like it would. If we could verify it does, we could work on
+optimizations when we need them. Our graph sizes would be small, especially at
+the start.
+
+We could create a GraphPattern every time an operation is applied to a pair of
+objects (GraphPattern's, EntityPattern's, or RelationPattern's). That sounds
+right. Because e.g. an EntityPattern alone is just that, but when we add
+relations and other operators it becomes something more.
+
+Actually, we would also need to make sure that each of the matched relations
+actually references one of the matched entities for each role, and filter out
+the ones, which don't.
+
+---
+
+OK, we got a problem with using > and <: chained comparisons. E.g. x > y > z
+is actually implemented as bool(x > y) and bool(y > z). A longer a > b > c > d
+would be bool(a > b) and bool(b > c) and bool(c > d). Both of these would be
+with shortcutting, but if we always return something "truthy", everything will
+be evaluated. However, the result of evaluating each comparison would be
+discarded. And so, for this to work, we would have to modify each (?) of the
+compared objects to preserve the information that it was the same object
+surrounded by > or < operators.
+
+So, how about we make each object inside an expression be a reference to a
+particular node in a shared graph pattern, merging the separate graph patterns
+generated by the sole operands as necessary?
+
+This way references to them could be stored and reused in other parts of the
+expression, using the := operator. Something like this:
+
+(x := +n.X) >> n.Y > n.Z > x
+
+The above would:
+* create a graph pattern matching a single "X" node, create and return a
+  reference to that node in that graph pattern
+* mark the referenced node for creation unconditionally, and create it when
+  updating the graph pattern
+* assign the node reference to variable "x"
+* create a graph pattern matching a single "Y" node (let's assume it exists),
+  and return a reference to that node in that graph pattern
+* take the two references above, merge the right graph pattern into the left
+  one, adding the edge pattern to the result, and recreating the "X" node,
+  this time with the edge connected to node "Y", then return the reference to
+  node "Y" in the new pattern. The Y reference should refer to the updated
+  (left) graph pattern
+* create a graph pattern matching a single "Z" node, create and return a
+  reference to that node in that pattern.
+* Take the latest reference to node "Y" and the reference to node "Z" we just
+  created, merge the right graph pattern into the left one, and add an edge
+  pattern connecting Y and Z, and then recreate the X and its edge connecting
+  it to Y, which also connects to Z. Return a reference to the Z node. The Z
+  node's reference should reference the updated (left) graph pattern.
+* Take the Z reference and the X reference we stored in X before. Do not merge
+  the graph patterns, because they're the same object (?)
+  * to make sure they're the same object we need to make sure all operators
+    are left-to-right associative, and keep the graph pattern created by the
+    leftmost operand?
+  Add a pattern for an edge connecting the Z and the X node patterns to the
+  graph pattern. Recreate whatever needs to be created, with updated
+  conditions. Return the X node reference.
+
+OK, wait, each operand has to have both left and right node references, along
+with a reference to its graph pattern.
+
+OK, what if we assign an operand to a variable, which references two different
+nodes from a complex subgraph pattern? Can we reuse it in another place?
+    - Looks like we can?
+
+How can we implement "and" and "or" operators?
+    - an and operator would just add more node and edge patterns
+    - we can think whether we need "or" or not later
+
+OK, so what are our base ideas/rules?
+* operand is a reference to two element (nodes/relations) patterns inside a
+  referenced graph pattern
+* operands are created via entity/relation pattern accessors of particular
+  graphs
+* Our supported operators
+  * <<, >> - source/target role that must be created, if not exists
+  * <, > - source/target role that must be matched
+  * + - create element unconditionally
+  * ~ - create element, if not exists
+  * - - match element
+* An operation always merges the right graph pattern into the left one, and
+  updates the right operand's graph pattern reference to point to the left
+  one.
+  * Wait, we should be able to assign the operand to a variable for later
+    reference. So the operand is keeping its left/right references.
+    However, the operation is supposed to return an operand with left
+    reference being the left operand of the operation. It can do that, but
+    that will be discarded in a chained condition, and we're back to square
+    one: we need to update the right operand left/right references to allow it
+    to carry over to the right part of the chained condition, but we can't do
+    that because it will break variable referencing. SIIIIGH...
+* When specifying keyword arguments to relation pattern calls, with operands
+  as values, the graph pattern is updated to match the left element of the
+  operand playing the role with the argument's name in the relation.
+    * We can come up with something to support marking roles for conditional
+      or unconditional creation via the arguments later.
+
+
+OK, can we survive without referencing parts of the subgraph pattern?
+    - not really, we need to be able to reference each specific node/relation
+      they match.
+
+OK, can we perhaps survive just one operator for source/target role?
+The <<, >> pair? And make its behavior customizable per graph?
+
+Then add a collection of operators for connecting an arbitrary role?
+
+E.g.:
+
++n.X + "source" + +r.R + "target" + +n.Y
+
+Aargh, so cumbersome.
+
+What if we instead use the unary +/-/~ operators on sections of graph
+patterns, including relations? Something like this:
+
++(n.X >> n.Y)
+
+Hmm, not bad so far...
+And I love how it would let us avoid updating objects.
+
+OK, what if we need to only create and connect a new node with a typeless
+relation to an existing node?
+
++n.X >> n.Y
+
+- in theory this could mean that the new n.X node needs to be set as the
+  source role for an existing relation already having n.Y as its target, which
+  is not what we want. Could it mean that the relation needs to be created?
+  Because the operator is atomic?
+
+Can we make this a bit more explicit and verbose? Something like this:
+
++(n.X >> r) >> n.Y
+
+- The operand in parens would have the node on the left and the relation on
+  the right. The "target" role would be considered atomic and created
+  implicitly, because at least one side of it is created? Eeehhh...
+
+OK, still more explicit/verbose:
+
++(n.X - "source" - r - "target") - n.Y
+
+- The operand in parens would have the node on the left and the role slot on
+  the right. Aargh role patterns now 🙈
+
+So, we cannot have operators specifying what to do with the connection they
+create. Operators cannot be on the edges of a subgraph marked for
+(conditional) creation / matching. Therefore, with this approach, operators
+would have to infer their condition from the operands. Ugh.
+
+OK, for each operand condition:
+
+Left    Right   Outcome     Example
+-       -       -           n.X >> n.Y, n.X >> r >> n.Y
+-       ~       ~           ~n.X >> n.Y, ~(n.X >> r) >> n.Y
+-       +       +
+~       -       ~           n.X >> ~n.Y, n.X >> ~(r >> n.Y)
+~       ~       ~           ~n.X >> ~n.Y, ~n.X >> ~(r >> n.Y)
+~       +       +           
++       -       +
++       ~       +
++       +       +
+
+This means, that in principle elements created by operators themselves don't
+have to have conditions, as they can always be inferred from operands.
+
+OK, perhaps we can work with that.
+
+OK, so what would the new binary operator `-` do?
+- Create a binding between an entity and a role name - role plug
+- Create a binding between a relation and a role name - role socket
+
+Wait, if we want to support relations playing a role then we could have
+ambiguity:
+
+    r.X - "trigger" - r.Y
+
+Which one has the role and which one plays the role?
+
+Could we add different operators for binding a role to a relation, and for
+playing a role? Something like this:
+
+    r.X * "trigger" - r.Y
+
+This would be saying that the relation r.Y is playing the "trigger" role in
+relation r.X. This would be the same:
+
+    r.Y - "trigger" * r.X
+
+OK, so let's try to settle our terminology (after asking ChatGPT about movie
+production terms):
+
+* A role name attached to nothing is called a "role name"
+* A role name attached to a relation, without an actor assigned is called an
+  "open role" (or "unfilled role")
+* A role name attached to an actor, without a relation assigned is called an
+  "attachment" (or "casting in principle")
+* A role name attached both to the relation and the actor is called a
+  "casting".
+
+So the `*` operator:
+* Accepts a relation on one side, and either an attachment, or role name, on
+  the other.
+* Produces either a casting, or an open role, respectively.
+
+And the `-` operator:
+* Accepts an element (relation or entity) on one side, and either an open
+  role, or role name, on the other.
+* Produces either a casting, or an attachment, respectively.
+
+When a casting is produced, the relation pattern gets the role added.
+
+This could get us uniform handling of matching/creation choices.
+If we get rid of specifying relations inside relation calls, then we won't
+have to come up with anything special for handling role operations there, and
+the behavior of entity and relation calls would be identical.
+
+So:
+    n.X - "target" * r * "source" - n.Z
+would be identical to:
+    n.X << r << n.Z
+and to:
+    n.X << n.Z
+
+But let's see how each of those breaks down on the match/create boundary.
+
+This:
+    +n.X << n.Z
+Would mean:
+    Find n.Z, and create n.X along with a typeless relation connecting n.Z as
+    the source and n.X as the target.
+
+This:
+    +n.X << +n.Z
+or
+    +(n.X << n.Z)
+Would mean:
+    Create both n.X and n.Z as well as the relation between them.
+
+This:
+    +n.X << r << n.Z
+Would mean:
+    Find n.Z with a typeless relation connecting it as the source.
+    Create n.X and connect it as the "target" of that relation.
+This:
+    +n.X << +r << n.Z
+or
+    +(n.X << r) << n.Z
+Would mean:
+    Find n.Z, create n.X and a relation connecting it as the target.
+    Connect n.Z as the source of that relation.
+
+This:
+    +n.X << +r << +n.Z
+or
+    +(n.X << r << n.Z)
+Would mean:
+    Create n.X, n.Z and a relation connecting them.
+
+This:
+    +n.X - "target" * r * "source" - n.Z
+or (in theory)
+    +n.X - +"target" * r * "source" - n.Z
+or
+    +(n.X - "target") * r * "source" - n.Z
+Would mean:
+    Find a typeless relation with n.Z connected as the source.
+    Create n.X and connect it as the target to that relation.
+
+This:
+    +n.X - "target" * +r * "source" - n.Z
+or (in theory)
+    +n.X - +"target" * +r * "source" - n.Z
+or
+    +(n.X - "target" * r) * "source" - n.Z
+or (in theory)
+    +n.X - +"target" * +r * +"source" - n.Z
+or
+    +(n.X - "target" * r * "source") - n.Z
+Would mean:
+    Find n.Z, create n.X and a relation connecting it as the target.
+    Connect n.Z as the source of that relation.
+
+This:
+    +n.X - "target" * +r * "source" - +n.Z
+or (in theory)
+    +n.X - +"target" * +r * "source" - n.Z
+or (in theory)
+    +n.X - "target" * +r * +"source" - n.Z
+or (in theory)
+    +n.X - +"target" * +r * +"source" - +n.Z
+or
+    +(n.X - "target" * r * "source" - n.Z)
+Would mean:
+    Create n.X, n.Z and a relation connecting them.
+
+We can start implementing the most verbose syntax and then implement the
+abbreviated syntaxes through that.
+
+Should we try replacing the `*` operator with `@` or with `%`? Would that be
+more readable?
+
+Let's try:
+
+    n.X - "target" * r * "source" - n.Z
+vs
+    n.X - "target" @ r @ "source" - n.Z
+vs
+    n.X - "target" % r % "source" - n.Z
+
+Eeeeeh, not really better.
+At least the precedence of `*` is clear to most people.
+
+OK, let's try throwing something together.
