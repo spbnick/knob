@@ -435,11 +435,11 @@ production terms):
 
 * A role name attached to nothing is called a "role name"
 * A role name attached to a relation, without an actor assigned is called an
-  "open role" (or "unfilled role")
+  "open role" (or "unfilled role"), or perhaps a "role socket".
 * A role name attached to an actor, without a relation assigned is called an
-  "attachment" (or "casting in principle")
+  "attachment" (or "casting in principle"), or perhaps a "role plug".
 * A role name attached both to the relation and the actor is called a
-  "casting".
+  "casting", or perhaps just a "role"
 
 So the `*` operator:
 * Accepts a relation on one side, and either an attachment, or role name, on
@@ -555,3 +555,35 @@ Eeeeeh, not really better.
 At least the precedence of `*` is clear to most people.
 
 OK, let's try throwing something together.
+
+Let's skip "create if doesn't exist" for now and just implement "match" or
+"create", for simplicity. It will be hard enough as it is.
+----
+
+So, when operators act on (sub)graph patterns, they have to update elements,
+like changing roles in a relation and changing attributes in
+relations/entities.
+
+However, how do we keep the various references intact? Starting with
+left/right references of the graph pattern itself, through role references and
+ending at role plug/socket references? And at the same time, how do we take
+care of the references that are out of our control, such as the user assigning
+a particular operand to a variable, and reusing it later in the expression?
+
+Should we, instead of updating the various operands during the operation,
+actually record all the operations and replay them as necessary when
+realizing/unrealizing the pattern (on every operation being created)?
+
+E.g. what do we do, if the user stored a node pattern before its attributes
+were updated, and used it in a relation later in the expression?
+
+That should mean that in both cases the same (created and) matched nodes
+should be iterated over. I mean, when we go and realize our subgraph pattern
+we substitute the nodes we got into both of these. Doesn't that mean that we
+would first have to try to match non-existing nodes, accept that they're
+non-existent and keep unrolling the whole expression until we run out and
+raise an exception, or hit the "create" operator?
+
+Phew, I think we need to simplify our prototype now, to be able to work it
+out.
+

@@ -1,62 +1,5 @@
 """
 KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
-
-An overview of various types and how they're used:
-
-    Graph:
-        entities: EntityDomainAccessor
-        relations: RelationDomainAccessor
-
-    EntityDomainAccessor:
-        __getattr__(type_name): EntityTypeAccessor
-        __getitem__(type_name): EntityTypeAccessor
-
-    EntityTypeAccessor:
-        __getattr__(name): EntityReference
-        __getitem__(name): EntityReference
-
-    EntityReference:
-        __lshift__(EntityReference): EntityReference
-        __rshift__(EntityReference): EntityReference
-        __lshift__(RelationTemplate): RelationTemplate
-        __rshift__(RelationTemplate): RelationTemplate
-
-    RelationDomainAccessor:
-        __getattr__(type_name): RelationTemplate
-        __getitem__(type_name): RelationTemplate
-
-    RelationTemplate:
-        __call__(attrs_and_roles): RelationTemplate
-        __lshift__(EntityReference): EntityReference
-        __rshift__(EntityReference): EntityReference
-
-Access patterns:
-
-    Graph
-     |
-     |    EntityDomainAccessor
-     |     |
-     |     |       EntityTypeAccessor
-     |     |        |
-     |     |        |     EntityReference
-     |     |        |      |
-     v     v        v      v
-    graph.entities.<type>.<name>(**attrs)
-
-    Graph
-     |
-     |    RelationDomainAccessor
-     |     |
-     |     |       RelationTemplate
-     |     |        |
-     v     v        v
-    graph.relations.<type>(**attrs_and_roles) >> entity
-
-Notes:
-
-    All role-assignment operations ('<<' and '>>') return the right operand.
-    Relations are created whenever a relation template is created/updated.
-    Adding a role to a relation (template) deletes the old relation.
 """
 
 from collections import defaultdict
@@ -684,65 +627,18 @@ class DictPattern(ValuePattern):
         return True
 
 
-class OperandPattern:
-    """A graph expression operand pattern"""
+class Operand:
+    """A graph pattern operand (left/right)"""
 
-    def __init__(self, graph: Graph):
-        """
-        Initialize the operand pattern.
-
-        Args:
-            graph: The graph the matched operands belong to.
-        """
-        self.graph = graph
-
-    def is_enumerable(self):
-        """Check if the pattern matches enumerable operands"""
-        raise NotImplementedError
 
 class ElementPattern(Operand):
     """An abstract element (relation or entity) pattern"""
 
-    def __neg__(self):
-        """Create a subgraph pattern matching this element pattern"""
-        return GraphPattern(
-            self.graph,
-            elements={self: False},
-            left=self,
-            right=self
-        )
-
-    def __invert__(self):
-        """
-        Create a subgraph pattern creating any elements this (enumerable)
-        pattern will match, if not found.
-        """
-        assert self.is_enumerable()
-        return GraphPattern(
-            self.graph,
-            elements={self: None},
-            left=self,
-            right=self
-        )
-
-    def __pos__(self):
-        """
-        Create a subgraph pattern creating any elements this (enumerable)
-        pattern will match, unconditionally.
-        """
-        assert self.is_enumerable()
-        return GraphPattern(
-            self.graph,
-            elements={self: True},
-            left=self,
-            right=self
-        )
 
 class EntityPattern(ElementPattern):
     """A graph entity pattern"""
 
     def __init__(self,
-                 graph: Graph,
                  type_name_pattern: ValuePattern,
                  name_pattern: ValuePattern,
                  attrs_pattern=UNIVERSAL_PATTERN: ValuePattern):
@@ -750,50 +646,19 @@ class EntityPattern(ElementPattern):
         Initialize the entity pattern.
 
         Args:
-            graph:              The graph the matched entities belong to.
             type_name_pattern:  The pattern for the entity type name.
             name_pattern:       The pattern for the entity name.
             attrs_pattern:      The pattern for the attribute dictionary.
         """
-        self.graph = graph
         self.type_name_pattern = type_name_pattern
         self.name_pattern = name_pattern
         self.attrs_pattern = attrs_pattern
-
-    def __rshift__(self, opd):
-        """
-        Create a graph pattern matching an (implicit) relation of this entity
-        pattern (as the "source" role) with an operand pattern.
-        """
-        if not instance(opd, OperandPattern):
-            return NotImplemented
-        if isinstance(opd, EntityPattern):
-            elements = {
-                self: False,
-                self.graph.relations[""](**{SOURCE_ROLE_NAME: self,
-                                            TARGET_ROLE_NAME: opd}): False
-            }
-        elif isinstance(opd, RelationPattern):
-            elements = {
-                self: False,
-                opd(**{SOURCE_ROLE_NAME: self}): False
-            }
-        else:
-            return NotImplemented
-        # TODO EXPLODE AND MERGE GRAPHS!
-        return GraphPattern(
-            self.graph,
-            elements=elements,
-            left=self,
-            right=opd
-        )
 
 
 class RelationPattern(ElementPattern):
     """A graph relation pattern"""
 
     def __init__(self,
-                 graph: Graph,
                  type_name_pattern: ValuePattern,
                  attrs_pattern=UNIVERSAL_PATTERN: ValuePattern,
                  role_patterns=None: None | dict[str, EntityPattern]):
@@ -801,27 +666,44 @@ class RelationPattern(ElementPattern):
         Initialize the relation pattern.
 
         Args:
-            graph:              The graph the matched relations belong to.
             type_name_pattern:  The pattern for the relation type name.
             attrs_pattern:      The pattern for the attribute dictionary.
             role_patterns:      A dictionary of role names and entity patterns
                                 that must be present in the relation.
-                                None, if roles should be ignored.
+                                None means empty dictionary.
         """
-        self.graph = graph
         self.type_name_pattern = type_name_pattern
         self.attrs_pattern = attrs_pattern
-        self.role_patterns = role_patterns
+        self.role_patterns = role_patterns or {}
 
 
-class GraphPattern(Operand):
+class RoleConnector(Operand):
+    """An attachment of a role name to an element"""
+    def __init__(self, role: str, element: ElementPattern):
+        self.role = role
+        self.element = element
+
+
+class RoleSocket(RoleConnector):
+    """A role name attached to a relating relation (an "open role")"""
+    def __init__(self, role: str, relation: RelationPattern):
+        super().__init__(role, relation)
+
+
+class RolePlug(RoleConnector):
+    """A role name attached to an actor element (an "attachment")"""
+    def __init__(self, role: str, element: ElementPattern):
+        super().__init__(role, element)
+
+
+class GraphPattern:
     """A (sub)graph pattern"""
 
     def __init__(self,
                  graph: Graph,
-                 elements: dict[ElementPattern, None | bool],
-                 left: ElementPattern,
-                 right: ElementPattern):
+                 elements: dict[ElementPattern, bool],
+                 left: Operand,
+                 right: Operand):
         """
         Initialize the graph pattern.
 
@@ -830,22 +712,22 @@ class GraphPattern(Operand):
                         All supplied elements must reference this graph.
             elements:   A dictionary of patterns matching elements
                         (entities or relations) belonging to the subgraph, and
-                        one of the three values:
+                        one of the two values:
                         * False, if the element pattern should be matched.
-                        * None, if any element matching the (enumerable)
-                          pattern should be created, if they don't exist.
                         * True, if all elements matching the (enumerable)
                           pattern should be created unconditionally.
                         Roles in any relation patterns contained in this
                         dictionary can only reference entity patterns from the
-                        same dictionary. All elements in this dictionary must
-                        reference the supplied graph.
-            left:       An element pattern considered to be the "leftmost" in
-                        this subgraph. Must exist in the element dictionary.
-            right:      An element considered to be the "rightmost" in
-                        this subgraph. Must exist in the element dictionary.
+                        same dictionary.
+            left:       An operand considered to be the "leftmost" in
+                        this subgraph pattern. If element, must exist in the
+                        element dictionary, if role connector, must reference
+                        element in the element dictionary.
+            right:      An operand considered to be the "rightmost" in
+                        this subgraph pattern. If element, must exist in the
+                        element dictionary, if role connector, must reference
+                        element in the element dictionary.
         """
-        assert all(e.graph is graph for e in elements)
         entities = {
             e: c
             for e, c in elements.items() if isinstance(e, EntityPattern)
@@ -859,32 +741,16 @@ class GraphPattern(Operand):
             for relation in relations
             for entity in relation.role_patterns.values()
         }
-        assert left in elements
-        assert right in elements
+        assert left in elements if isinstance(left, ElementPattern) else \
+            left.element in elements
+        assert right in elements if isinstance(right, ElementPattern) else \
+            right.element in elements
         self.graph = graph
         self.elements = elements
         self.entities = entities
         self.relations = relations
         self.left = left
         self.right = right
-
-    def __neg__(self):
-        """Mark the subgraph pattern to be matched"""
-        return GraphPattern(
-            self.graph,
-            elements={e: False for e in self.elements},
-            left=self.left,
-            right=self.right
-        )
-
-    def __invert__(self):
-        """Mark the subgraph pattern to be created, if not matched"""
-        return GraphPattern(
-            self.graph,
-            elements={e: None for e in self.elements},
-            left=self.left,
-            right=self.right
-        )
 
     def __pos__(self):
         """Mark the subgraph pattern to be created, not matched"""
@@ -895,6 +761,112 @@ class GraphPattern(Operand):
             right=self.right
         )
 
+    def __pos__(self):
+        """Mark the subgraph pattern to be matched, not created"""
+        return GraphPattern(
+            self.graph,
+            elements={e: False for e in self.elements},
+            left=self.left,
+            right=self.right
+        )
+
+    def __rshift__(self, other):
+        if not isinstance(other, GraphPattern):
+            return NotImplemented
+
+        assert other.graph is self.graph
+
+        left = self.right
+        right = other.left
+
+        def types(left_type, right_type):
+            return isinstance(left, left_type) and \
+                isinstance(right, right_type)
+
+        def merge_elements(*elements_list):
+            """
+            Merge element pattern state dictionaries.
+
+            Args:
+                elements_list:  The list of element pattern state dictionaries
+                                to merge together into a single one. The keys
+                                of each dictionary are element patterns and
+                                the values are booleans specifying whether the
+                                patterns should be matched (False), or created
+                                unconditionally (True), assuming they're
+                                enumerable in the latter case.
+
+            Returns:
+                The merged element pattern state dictionaries. If an element
+                is present in multiple dictionaries, the maximum state boolean
+                will be picked.
+            """
+            merged_elements = {}
+            for elements in elements_list:
+                for element, state in elements.items():
+                    merged_elements[element] = max(
+                        merged_elements.get(element, False), state
+                    )
+            return merged_elements
+
+        if types(EntityPattern, EntityPattern):
+            relation = RelationPattern(
+                StringPattern(""),
+                role_patterns={SOURCE_ROLE_NAME: left,
+                               TARGET_ROLE_NAME: right}
+            )
+            result = GraphPattern(
+                self.graph,
+                elements=merge_elements(
+                    self.elements,
+                    other.elements,
+                    {relation: max(self.elements[self.right],
+                                   other.elements[other.left])}
+                ),
+                left=self.left,
+                right=other.right
+            )
+        elif types(RelationPattern, EntityPattern):
+            role_patterns = left.role_patterns.copy()
+            role_patterns[TARGET_ROLE_NAME] = right
+            relation = RelationPattern(left.type_name_pattern,
+                                       left.attrs_pattern,
+                                       role_patterns)
+            elements = merge_elements(
+                self.elements,
+                other.elements,
+                {relation: self.elements[left]}
+            )
+            del elements[left]
+            result = GraphPattern(
+                self.graph,
+                elements=elements,
+                self.left,
+                other.right
+            )
+        elif types(EntityPattern, RelationPattern):
+            role_patterns = right.role_patterns.copy()
+            role_patterns[SOURCE_ROLE_NAME] = left
+            relation = RelationPattern(right.type_name_pattern,
+                                       right.attrs_pattern,
+                                       role_patterns)
+            elements = merge_elements(
+                self.elements,
+                other.elements,
+                {relation: other.elements[right]}
+            )
+            del elements[right]
+            result = GraphPattern(
+                self.graph,
+                elements=elements,
+                self.left,
+                other.right
+            )
+
+        self.unrealize()
+        other.unrealize()
+        result.realize()
+        return result
 
 
 class EntityPatternTypeAccessor:
@@ -907,16 +879,22 @@ class EntityPatternTypeAccessor:
         self.type_pattern = StringPattern(self.type_name)
 
     def __getattr__(self, name: str) -> EntityPattern:
-        """Create a pattern with the accessor's type and specified name"""
-        return EntityPattern(self.graph,
-                             self.type_pattern,
-                             StringPattern(name))
+        """
+        Create a subgraph pattern matching an entity with the accessor's type
+        and the specified name.
+        """
+        return self[name]
 
     def __getitem__(self, name: str) -> EntityPattern:
-        """Create a pattern with the accessor's type and specified name"""
-        return EntityPattern(self.graph,
-                             self.type_pattern,
-                             StringPattern(name))
+        """
+        Create a subgraph pattern matching an entity with the accessor's type
+        and the specified name.
+        """
+        entity = EntityPattern(self.type_pattern, StringPattern(name))
+        return GraphPattern(self.graph,
+                            elements={entity: False},
+                            left=entity,
+                            right=entity)
 
 
 class EntityPatternAccessor:
@@ -943,9 +921,17 @@ class RelationPatternAccessor:
         self.graph = graph
 
     def __getattr__(self, type_name: str) -> RelationTemplate:
-        """Create a relation pattern for a type"""
-        return RelationPattern(self.graph, StringPattern(type_name))
+        """
+        Create a subgraph pattern matching a relation with the specified type.
+        """
+        return self[type_name]
 
     def __getitem__(self, type_name: str) -> RelationTemplate:
-        """Create a relation pattern for a type"""
-        return RelationPattern(self.graph, StringPattern(type_name))
+        """
+        Create a subgraph pattern matching a relation with the specified type.
+        """
+        relation = RelationPattern(StringPattern(type_name))
+        return GraphPattern(self.graph,
+                            elements={relation: False},
+                            left=relation,
+                            right=relation)
