@@ -587,3 +587,7 @@ raise an exception, or hit the "create" operator?
 Phew, I think we need to simplify our prototype now, to be able to work it
 out.
 
+Let's work with literal values for now.
+
+OK, we can create a structure of the base operands and operations as we go
+through an expression.
