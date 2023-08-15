@@ -399,7 +399,7 @@ Left    Right   Outcome     Example
 -       +       +
 ~       -       ~           n.X >> ~n.Y, n.X >> ~(r >> n.Y)
 ~       ~       ~           ~n.X >> ~n.Y, ~n.X >> ~(r >> n.Y)
-~       +       +           
+~       +       +
 +       -       +
 +       ~       +
 +       +       +
@@ -591,3 +591,66 @@ Let's work with literal values for now.
 
 OK, we can create a structure of the base operands and operations as we go
 through an expression.
+
+---
+So, we need to support role opening operation `*` on a role opening,
+overriding any role with the matching name. Same with role casting operation
+`-`.
+---
+r * "source" - e
+r * "source" * "target" - e
+
+"target" * r * "source" * "target" - e
+
+What can be on the one side and what on the other?
+
+Enumerating possible operands of the casting operator (`-`):
+
+
+    role    - element   # Create casting
+    role    - casting   # Override casting's role
+    opening - element   #
+
+
+opening - element
+
+One side - element being cast
+Another side - role or opening
+
+What about this:
+
+r * "target" - ("source" - e)
+
+    - invalid
+
+Oh, wait, but what if it's on the other side?
+
+("source" - e) - "target" * r
+
+That's fine!
+
+And this:
+
+r * "target" * ("source" - e)
+
+Equivalent to
+
+r * "source" - e
+
+OK, so the arguments are actually:
+
+    casting - opening   # ("source" - e) - "target" * r
+                        # but NOT ("source" - e) - (r * "target")
+    casting - role      # (e - "source") - "target", ("source" - e) - "target"
+    element - opening   # e - ("source" * r),
+                        # but NOT e - (r * "source")
+    element - role      # e - "source", "target" - r
+
+And for the role-opening operation (`*`):
+
+    opening * casting   # ("target" * r) * ("source" - e),
+                        # but NOT ("target" * r) * (e - "source")
+    opening * role      # (r * "target") * "source", "source" * ("target" * r)
+    relation * casting  # r * ("target" - e),
+                        # but NOT r * (e - "target")
+    relation * role     # r * "source", "target" * r

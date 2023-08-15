@@ -39,7 +39,65 @@ class Opnd(ABC):
         pass
 
 
-class ElementOpnd(Opnd):
+class RoleOpnd(Opnd):
+    """An unassigned role operand"""
+    def __init__(self, graph: Graph, name: str):
+        super().__init__(graph)
+        self.name = name
+
+    def __repr__(self):
+        return repr(self.name)
+
+
+class ActorOpnd(Opnd):
+    """An actor operand (something which can be cast for a role)"""
+
+    def __sub__(self, role_or_director) -> \
+            ForwardRef('CastOp') | NotImplemented:
+        """Create a role-casting operator for S - O expression """
+        if isinstance(role_or_director, DirectorOpnd):
+            assert role_or_director.graph is self.graph
+            return CastOp(self, role_or_director)
+        if isinstance(role_or_director, str):
+            return CastOp(self, RoleOpnd(self.graph, role_or_director))
+        return NotImplemented
+
+    def __rsub__(self, role_or_director) -> \
+            ForwardRef('CastOp') | NotImplemented:
+        """Create a role-casting operator for O - S expression """
+        if isinstance(role_or_director, DirectorOpnd):
+            assert role_or_director.graph is self.graph
+            return CastOp(role_or_director, self)
+        if isinstance(role_or_director, str):
+            return CastOp(RoleOpnd(self.graph, role_or_director), self)
+        return NotImplemented
+
+
+class DirectorOpnd(Opnd):
+    """A casting director operand (something which can open a role)"""
+
+    def __mul__(self, role_or_actor) -> \
+            ForwardRef('OpenOp') | NotImplemented:
+        """Create a role-opening operator for S * O expression """
+        if isinstance(role_or_actor, ActorOpnd):
+            assert role_or_actor.graph is self.graph
+            return OpenOp(self, role_or_actor)
+        if isinstance(role_or_actor, str):
+            return OpenOp(self, RoleOpnd(self.graph, role_or_actor))
+        return NotImplemented
+
+    def __rmul__(self, role_or_actor) -> \
+            ForwardRef('OpenOp') | NotImplemented:
+        """Create a role-opening operator for O * S expression """
+        if isinstance(role_or_actor, ActorOpnd):
+            assert role_or_actor.graph is self.graph
+            return OpenOp(role_or_actor, self)
+        if isinstance(role_or_actor, str):
+            return OpenOp(RoleOpnd(self.graph, role_or_actor), self)
+        return NotImplemented
+
+
+class ElementOpnd(ActorOpnd):
     """An element operand"""
 
     def __getattr__(self, key: str) -> 'UpdateOp':
@@ -56,75 +114,55 @@ class ElementOpnd(Opnd):
         """Create an attribute update operator"""
         return UpdateOp(self, attrs)
 
-    def __sub__(self, role_or_opening) -> \
-            ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for S - R expression """
-        if isinstance(role_or_opening, OpeningOpnd):
-            assert role_or_opening.graph is self.graph
-            return CastOp(role_or_opening, self, True)
-        if isinstance(role_or_opening, str):
-            return CastOp(RoleOpnd(self.graph, role_or_opening), self, True)
-        return NotImplemented
-
-    def __rsub__(self, role_or_opening) -> \
-            ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for R - S expression """
-        if isinstance(role_or_opening, OpeningOpnd):
-            assert role_or_opening.graph is self.graph
-            return CastOp(role_or_opening, self, False)
-        if isinstance(role_or_opening, str):
-            return CastOp(RoleOpnd(self.graph, role_or_opening), self, False)
-        return NotImplemented
-
 
 class EntityOpnd(ElementOpnd):
     """An entity operand"""
 
-    def __rshift__(self, element) -> \
+    def __rshift__(self, opnd) -> \
             ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for S >> E expression"""
-        if isinstance(element, RelationOpnd):
-            assert element.graph is self.graph
-            return self - "source" * element
-        if isinstance(element, EntityOpnd):
-            assert element.graph is self.graph
+        """Create edge/role expression for S >> O expression"""
+        if isinstance(opnd, RelationOpnd):
+            assert opnd.graph is self.graph
+            return self - "source" * opnd
+        if isinstance(opnd, EntityOpnd):
+            assert opnd.graph is self.graph
             return self - "source" * RelationOpnd(self.graph) * \
-                "target" - element
+                "target" - opnd
         return NotImplemented
 
-    def __lshift__(self, element) -> \
+    def __lshift__(self, opnd) -> \
             ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for S << E expression"""
-        if isinstance(element, RelationOpnd):
-            assert element.graph is self.graph
-            return self - "target" * element
-        if isinstance(element, EntityOpnd):
-            assert element.graph is self.graph
+        """Create edge/role expression for S << O expression"""
+        if isinstance(opnd, RelationOpnd):
+            assert opnd.graph is self.graph
+            return self - "target" * opnd
+        if isinstance(opnd, EntityOpnd):
+            assert opnd.graph is self.graph
             return self - "target" * RelationOpnd(self.graph) * \
-                "source" - element
+                "source" - opnd
         return NotImplemented
 
-    def __rlshift__(self, element) -> \
+    def __rlshift__(self, opnd) -> \
             ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for E << S expression"""
-        if isinstance(element, RelationOpnd):
-            assert element.graph is self.graph
-            return element * "target" - self
-        if isinstance(element, EntityOpnd):
-            assert element.graph is self.graph
-            return element - "target" * RelationOpnd(self.graph) * \
+        """Create edge/role expression for O << S expression"""
+        if isinstance(opnd, RelationOpnd):
+            assert opnd.graph is self.graph
+            return opnd * "target" - self
+        if isinstance(opnd, EntityOpnd):
+            assert opnd.graph is self.graph
+            return opnd - "target" * RelationOpnd(self.graph) * \
                 "source" - self
         return NotImplemented
 
-    def __rrshift__(self, element) -> \
+    def __rrshift__(self, opnd) -> \
             ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for E >> S expression"""
-        if isinstance(element, RelationOpnd):
-            assert element.graph is self.graph
-            return element * "target" - self
-        if isinstance(element, EntityOpnd):
-            assert element.graph is self.graph
-            return element - "source" * RelationOpnd(self.graph) * \
+        """Create edge/role expression for O >> S expression"""
+        if isinstance(opnd, RelationOpnd):
+            assert opnd.graph is self.graph
+            return opnd * "target" - self
+        if isinstance(opnd, EntityOpnd):
+            assert opnd.graph is self.graph
+            return opnd - "source" * RelationOpnd(self.graph) * \
                 "target" - self
         return NotImplemented
 
@@ -132,49 +170,19 @@ class EntityOpnd(ElementOpnd):
         return "e"
 
 
-class RelationOpnd(ElementOpnd):
+class RelationOpnd(ElementOpnd, DirectorOpnd):
     """A relation operand"""
-
-    def __mul__(self, role_or_casting) -> \
-            ForwardRef('OpenOp') | NotImplemented:
-        """Create a role-opening operator for S * R expression """
-        if isinstance(role_or_casting, CastingOpnd):
-            assert role_or_casting.graph is self.graph
-            return OpenOp(self, role_or_casting, False)
-        if isinstance(role_or_casting, str):
-            return OpenOp(self, RoleOpnd(self.graph, role_or_casting), False)
-        return NotImplemented
-
-    def __rmul__(self, role_or_casting) -> \
-            ForwardRef('OpenOp') | NotImplemented:
-        """Create a role-opening operator for R * S expression """
-        if isinstance(role_or_casting, CastingOpnd):
-            assert role_or_casting.graph is self.graph
-            return OpenOp(self, role_or_casting, True)
-        if isinstance(role_or_casting, str):
-            return OpenOp(self, RoleOpnd(self.graph, role_or_casting), True)
-        return NotImplemented
 
     def __repr__(self):
         return "r"
 
 
-class RoleOpnd(Opnd):
-    """An unassigned role operand"""
-    def __init__(self, graph: Graph, name: str):
-        super().__init__(graph)
-        self.name = name
-
-    def __repr__(self):
-        return repr(self.name)
+class CastingOpnd(Opnd):
+    """A role's casting operand"""
 
 
 class OpeningOpnd(Opnd):
-    """A role's opening operand (a role name assigned to a relation)"""
-
-
-class CastingOpnd(Opnd):
-    """A role's casting operand (a role name assigned to an element)"""
+    """A role's opening operand"""
 
 
 class Op(Opnd):
@@ -205,7 +213,7 @@ class UpdateOp(Op, EntityOpnd, RelationOpnd):
         return opnd_repr_left(self.element, self) + expr
 
 
-class SetCreationOp(Op, EntityOpnd, RelationOpnd, OpeningOpnd, CastingOpnd):
+class SetCreationOp(Op, EntityOpnd, RelationOpnd):
     """An operation changing the operand's creation state"""
     def __init__(self, opnd: Opnd, create: bool):
         super().__init__(opnd.graph)
@@ -217,46 +225,38 @@ class SetCreationOp(Op, EntityOpnd, RelationOpnd, OpeningOpnd, CastingOpnd):
             opnd_repr_right(self, self.opnd)
 
 
-class OpenOp(Op, OpeningOpnd, EntityOpnd, RelationOpnd):
+class OpenOp(Op, EntityOpnd, RelationOpnd, CastingOpnd, OpeningOpnd):
     """An operation binding a role name or casting to a relation"""
-    def __init__(self,
-                 relation: RelationOpnd,
-                 role_or_casting: RoleOpnd | CastingOpnd,
-                 reverse: bool):
-        super().__init__(relation.graph)
-        self.relation = relation
-        self.role_or_casting = role_or_casting
-        self.reverse = reverse
+    def __init__(self, left, right):
+        def opnds_are_valid(x, y):
+            return isinstance(x, DirectorOpnd) and \
+                isinstance(y, (ActorOpnd, RoleOpnd))
+        assert opnds_are_valid(left, right) or opnds_are_valid(right, left)
+        assert left.graph is right.graph
+        super().__init__(left.graph)
+        self.left = left
+        self.right = right
 
     def __repr__(self):
-        # Piss off, pylint: disable=no-else-return
-        if self.reverse:
-            return opnd_repr_left(self.role_or_casting, self) + " * " + \
-                opnd_repr_right(self, self.relation)
-        else:
-            return opnd_repr_left(self.relation, self) + " * " + \
-                opnd_repr_right(self, self.role_or_casting)
+        return opnd_repr_left(self.left, self) + " * " + \
+            opnd_repr_right(self, self.right)
 
 
-class CastOp(Op, CastingOpnd, EntityOpnd, RelationOpnd):
-    """An operation binding a role name or opening to an actor element"""
-    def __init__(self,
-                 role_or_opening: RoleOpnd | OpeningOpnd,
-                 element: ElementOpnd,
-                 reverse: bool):
-        super().__init__(element.graph)
-        self.role_or_opening = role_or_opening
-        self.element = element
-        self.reverse = reverse
+class CastOp(Op, EntityOpnd, RelationOpnd, CastingOpnd, OpeningOpnd):
+    """An operation (re)binding a role name or opening to an actor element"""
+    def __init__(self, left, right):
+        def opnds_are_valid(x, y):
+            return isinstance(x, ActorOpnd) and \
+                isinstance(y, (DirectorOpnd, RoleOpnd))
+        assert opnds_are_valid(left, right) or opnds_are_valid(right, left)
+        assert left.graph is right.graph
+        super().__init__(left.graph)
+        self.left = left
+        self.right = right
 
     def __repr__(self):
-        # Piss off, pylint: disable=no-else-return
-        if self.reverse:
-            return opnd_repr_left(self.element, self) + " - " + \
-                opnd_repr_right(self, self.role_or_opening)
-        else:
-            return opnd_repr_left(self.role_or_opening, self) + " - " + \
-                opnd_repr_right(self, self.element)
+        return opnd_repr_left(self.left, self) + " - " + \
+            opnd_repr_right(self, self.right)
 
 
 # Precedence of operands - lower precedence first
