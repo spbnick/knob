@@ -11,13 +11,13 @@ def g():
 @pytest.fixture
 def e(g):
     """The graph's entity operand"""
-    return g.entity_opnd
+    return g.entity
 
 
 @pytest.fixture
 def r(g):
     """The graph's relation operand"""
-    return g.relation_opnd
+    return g.relation
 
 
 def test_element(e, r):
@@ -97,15 +97,19 @@ def test_element_opening_cast(e, r):
 def test_element_casting_open(e, r):
     assert repr((e - 'role') * r) == "(e - 'role') * r"
     assert repr(r * ('role' - e)) == "r * ('role' - e)"
-    assert repr((r - 'role') * e) == "(r - 'role') * e"
-    assert repr(e * ('role' - r)) == "e * ('role' - r)"
-    assert repr((e - 'role') * e) == "(e - 'role') * e"
-    assert repr(e * ('role' - e)) == "e * ('role' - e)"
+    with pytest.raises(TypeError):
+        (r - 'role') * e
+    with pytest.raises(TypeError):
+        e * ('role' - r)
+    with pytest.raises(TypeError):
+        (e - 'role') * e
+    with pytest.raises(TypeError):
+        e * ('role' - e)
     assert repr((r - 'role') * r) == "(r - 'role') * r"
     assert repr(r * ('role' - r)) == "r * ('role' - r)"
 
 
-def test_element_edge_element(e):
+def test_element_edge_element(e, r):
     assert repr(e >> e) == "e - 'source' * r * 'target' - e"
     assert repr(e - 'source' * r * 'target' - e) == \
         "e - 'source' * r * 'target' - e"
@@ -119,6 +123,6 @@ def test_element_edge_role(e, r):
 
 def test_element_edge_role_edge_element(e, r):
     assert repr(e >> (r >> e)) == "e - 'source' * (r * 'target' - e)"
-    assert repr((e >> r) >> e) == "e - 'source' * r * 'target' - e"
-    assert repr(e >> r >> e) == "e - 'source' * r * 'target' - e"
-    assert repr(e << r << e) == "e - 'target' * r * 'source' - e"
+    assert repr((e >> r) >> e) == "(e - 'source' * r) * 'target' - e"
+    assert repr(e >> r >> e) == "(e - 'source' * r) * 'target' - e"
+    assert repr(e << r << e) == "(e - 'target' * r) * 'source' - e"

@@ -654,3 +654,14 @@ And for the role-opening operation (`*`):
     relation * casting  # r * ("target" - e),
                         # but NOT r * (e - "target")
     relation * role     # r * "source", "target" * r
+
+Alright, reworking the AST with the ability to extract the left/right atoms
+gives us the following tables of adjacent atom combinations per operator.
+
+The role-casting operator (`-`):
+
+    element - role
+
+The role-opening operator (`*`):
+
+    relation * role

@@ -11,20 +11,38 @@ from abc import ABC, abstractmethod
 # We're being abstract here,
 # pylint: disable=too-few-public-methods,too-many-ancestors,invalid-name
 
+# We're all friends here, pylint: disable=protected-access
+
+# No, I like it this way, pylint: disable=no-else-return
+
 
 class Graph:
     """A graph"""
 
     def __init__(self):
-        self.entity_opnd = EntityOpnd(self)
-        self.relation_opnd = RelationOpnd(self)
+        self.entity = EntityAtom(self)
+        self.relation = RelationAtom(self)
 
 
-class Opnd(ABC):
-    """An operand"""
+class Expr(ABC):
+    """An expression (tree)"""
 
     def __init__(self, graph: Graph):
-        self.graph = graph
+        self._graph = graph
+
+    @property
+    @abstractmethod
+    def _left_atom(self):
+        """The leftmost atom of the expression tree."""
+
+    @property
+    @abstractmethod
+    def _right_atom(self):
+        """The rightmost atom of the expression tree."""
+
+    @abstractmethod
+    def __repr__(self):
+        pass
 
     def __pos__(self):
         """Create a creation-enabling operator"""
@@ -34,165 +52,193 @@ class Opnd(ABC):
         """Create a creation-disabling operator"""
         return SetCreationOp(self, False)
 
-    @abstractmethod
-    def __repr__(self):
-        pass
-
-
-class RoleOpnd(Opnd):
-    """An unassigned role operand"""
-    def __init__(self, graph: Graph, name: str):
-        super().__init__(graph)
-        self.name = name
-
-    def __repr__(self):
-        return repr(self.name)
-
-
-class ActorOpnd(Opnd):
-    """An actor operand (something which can be cast for a role)"""
-
-    def __sub__(self, role_or_director) -> \
-            ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for S - O expression """
-        if isinstance(role_or_director, DirectorOpnd):
-            assert role_or_director.graph is self.graph
-            return CastOp(self, role_or_director)
-        if isinstance(role_or_director, str):
-            return CastOp(self, RoleOpnd(self.graph, role_or_director))
-        return NotImplemented
-
-    def __rsub__(self, role_or_director) -> \
-            ForwardRef('CastOp') | NotImplemented:
-        """Create a role-casting operator for O - S expression """
-        if isinstance(role_or_director, DirectorOpnd):
-            assert role_or_director.graph is self.graph
-            return CastOp(role_or_director, self)
-        if isinstance(role_or_director, str):
-            return CastOp(RoleOpnd(self.graph, role_or_director), self)
-        return NotImplemented
-
-
-class DirectorOpnd(Opnd):
-    """A casting director operand (something which can open a role)"""
-
-    def __mul__(self, role_or_actor) -> \
-            ForwardRef('OpenOp') | NotImplemented:
-        """Create a role-opening operator for S * O expression """
-        if isinstance(role_or_actor, ActorOpnd):
-            assert role_or_actor.graph is self.graph
-            return OpenOp(self, role_or_actor)
-        if isinstance(role_or_actor, str):
-            return OpenOp(self, RoleOpnd(self.graph, role_or_actor))
-        return NotImplemented
-
-    def __rmul__(self, role_or_actor) -> \
-            ForwardRef('OpenOp') | NotImplemented:
-        """Create a role-opening operator for O * S expression """
-        if isinstance(role_or_actor, ActorOpnd):
-            assert role_or_actor.graph is self.graph
-            return OpenOp(role_or_actor, self)
-        if isinstance(role_or_actor, str):
-            return OpenOp(RoleOpnd(self.graph, role_or_actor), self)
-        return NotImplemented
-
-
-class ElementOpnd(ActorOpnd):
-    """An element operand"""
-
     def __getattr__(self, key: str) -> 'UpdateOp':
         """Create an implicit attribute update operator"""
-        return UpdateOp(self, {"": key})
+        if isinstance(self._right_atom, ElementAtom):
+            return UpdateOp(self, {"": key})
+        return NotImplemented
 
     def __getitem__(self, key) -> ForwardRef('UpdateOp') | NotImplemented:
         """Create an implicit attribute update operator"""
-        if isinstance(key, str):
+        if isinstance(self._right_atom, ElementAtom) and isinstance(key, str):
             return UpdateOp(self, {"": key})
         return NotImplemented
 
     def __call__(self, **attrs) -> ForwardRef('UpdateOp'):
         """Create an attribute update operator"""
-        return UpdateOp(self, attrs)
+        if isinstance(self._right_atom, ElementAtom):
+            return UpdateOp(self, attrs)
+        return NotImplemented
 
+    def __sub__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+        """Create a role-casting operator for S - O expression """
+        if isinstance(other, str):
+            other = RoleAtom(self._graph, other)
+        if CastOp.args_are_valid(self, other):
+            return CastOp(self, other)
+        return NotImplemented
 
-class EntityOpnd(ElementOpnd):
-    """An entity operand"""
+    def __rsub__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+        """Create a role-casting operator for O - S expression """
+        if isinstance(other, str):
+            other = RoleAtom(self._graph, other)
+        if CastOp.args_are_valid(other, self):
+            return CastOp(other, self)
+        return NotImplemented
 
-    def __rshift__(self, opnd) -> \
-            ForwardRef('CastOp') | NotImplemented:
+    def __mul__(self, other) -> ForwardRef('OpenOp') | NotImplemented:
+        """Create a role-opening operator for S * O expression """
+        if isinstance(other, str):
+            other = RoleAtom(self._graph, other)
+        if OpenOp.args_are_valid(self, other):
+            return OpenOp(self, other)
+        return NotImplemented
+
+    def __rmul__(self, other) -> ForwardRef('OpenOp') | NotImplemented:
+        """Create a role-opening operator for O * S expression """
+        if isinstance(other, str):
+            other = RoleAtom(self._graph, other)
+        if OpenOp.args_are_valid(other, self):
+            return OpenOp(other, self)
+        return NotImplemented
+
+    @staticmethod
+    def __shift(left, op, right) -> ForwardRef('CastOp') | NotImplemented:
+        """Create an expression for a shift operator"""
+        # No it's not, pylint: disable=too-many-return-statements
+        assert op in {"<<", ">>"}
+
+        if not isinstance(left, Expr) or not isinstance(right, Expr):
+            return NotImplemented
+
+        assert left._graph is right._graph
+
+        ltr = op == ">>"
+        left_atom = left._right_atom
+        right_atom = right._left_atom
+
+        if isinstance(left_atom, EntityAtom) and \
+           isinstance(right_atom, EntityAtom):
+            relation = RelationAtom(left._graph)
+            if ltr:
+                return left - "source" * relation * "target" - right
+            else:
+                return left - "target" * relation * "source" - right
+        elif isinstance(left_atom, RelationAtom) and \
+                isinstance(right_atom, EntityAtom):
+            if ltr:
+                return left * "target" - right
+            else:
+                return left * "source" - right
+        elif isinstance(left_atom, EntityAtom) and \
+                isinstance(right_atom, RelationAtom):
+            if ltr:
+                return left - "source" * right
+            else:
+                return left - "target" * right
+
+        return NotImplemented
+
+    def __rshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
         """Create edge/role expression for S >> O expression"""
-        if isinstance(opnd, RelationOpnd):
-            assert opnd.graph is self.graph
-            return self - "source" * opnd
-        if isinstance(opnd, EntityOpnd):
-            assert opnd.graph is self.graph
-            return self - "source" * RelationOpnd(self.graph) * \
-                "target" - opnd
-        return NotImplemented
+        return Expr.__shift(self, ">>", other)
 
-    def __lshift__(self, opnd) -> \
-            ForwardRef('CastOp') | NotImplemented:
-        """Create edge/role expression for S << O expression"""
-        if isinstance(opnd, RelationOpnd):
-            assert opnd.graph is self.graph
-            return self - "target" * opnd
-        if isinstance(opnd, EntityOpnd):
-            assert opnd.graph is self.graph
-            return self - "target" * RelationOpnd(self.graph) * \
-                "source" - opnd
-        return NotImplemented
-
-    def __rlshift__(self, opnd) -> \
-            ForwardRef('CastOp') | NotImplemented:
-        """Create edge/role expression for O << S expression"""
-        if isinstance(opnd, RelationOpnd):
-            assert opnd.graph is self.graph
-            return opnd * "target" - self
-        if isinstance(opnd, EntityOpnd):
-            assert opnd.graph is self.graph
-            return opnd - "target" * RelationOpnd(self.graph) * \
-                "source" - self
-        return NotImplemented
-
-    def __rrshift__(self, opnd) -> \
-            ForwardRef('CastOp') | NotImplemented:
+    def __rrshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
         """Create edge/role expression for O >> S expression"""
-        if isinstance(opnd, RelationOpnd):
-            assert opnd.graph is self.graph
-            return opnd * "target" - self
-        if isinstance(opnd, EntityOpnd):
-            assert opnd.graph is self.graph
-            return opnd - "source" * RelationOpnd(self.graph) * \
-                "target" - self
-        return NotImplemented
+        return Expr.__shift(other, ">>", self)
+
+    def __lshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+        """Create edge/role expression for S << O expression"""
+        return Expr.__shift(self, "<<", other)
+
+    def __rlshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+        """Create edge/role expression for O << S expression"""
+        return Expr.__shift(other, "<<", self)
+
+
+class Atom(Expr):
+    """An atomic (indivisible) expression (not an operator)"""
+
+    @property
+    def _left_atom(self):
+        return self
+
+    @property
+    def _right_atom(self):
+        return self
+
+
+class RoleAtom(Atom):
+    """An unassigned role"""
+
+    def __init__(self, graph: Graph, name: str):
+        super().__init__(graph)
+        self._name = name
+
+    def __repr__(self):
+        return repr(self._name)
+
+
+class ElementAtom(Atom):
+    """An element atom"""
+
+
+class EntityAtom(ElementAtom):
+    """An entity operand"""
 
     def __repr__(self):
         return "e"
 
 
-class RelationOpnd(ElementOpnd, DirectorOpnd):
+class RelationAtom(ElementAtom):
     """A relation operand"""
 
     def __repr__(self):
         return "r"
 
 
-class CastingOpnd(Opnd):
-    """A role's casting operand"""
+class Op(Expr):
+    """An operator over one or more expressions"""
 
 
-class OpeningOpnd(Opnd):
-    """A role's opening operand"""
+class UnaryOp(Op):
+    """An unary operator"""
+
+    def __init__(self, arg: Expr):
+        super().__init__(arg._graph)
+        self._arg = arg
+
+    @property
+    def _left_atom(self):
+        return self._arg._left_atom
+
+    @property
+    def _right_atom(self):
+        return self._arg._right_atom
 
 
-class Op(Opnd):
-    """An operation"""
+class BinaryOp(Op):
+    """A binary operator"""
+
+    def __init__(self, left: Expr, right: Expr):
+        assert left._graph is right._graph
+        super().__init__(left._graph)
+        self._left = left
+        self._right = right
+
+    @property
+    def _left_atom(self):
+        return self._left._left_atom
+
+    @property
+    def _right_atom(self):
+        return self._right._right_atom
 
 
-class UpdateOp(Op, EntityOpnd, RelationOpnd):
+class UpdateOp(UnaryOp):
     """An element attribute update operation"""
-    def __init__(self, element: ElementOpnd, attrs: dict[str, object]):
-        super().__init__(element.graph)
+    def __init__(self, element: Expr, attrs: dict[str, object]):
+        super().__init__(element)
         self.element = element
         self.attrs = attrs
 
@@ -213,98 +259,116 @@ class UpdateOp(Op, EntityOpnd, RelationOpnd):
         return opnd_repr_left(self.element, self) + expr
 
 
-class SetCreationOp(Op, EntityOpnd, RelationOpnd):
+class SetCreationOp(UnaryOp):
     """An operation changing the operand's creation state"""
-    def __init__(self, opnd: Opnd, create: bool):
-        super().__init__(opnd.graph)
-        self.opnd = opnd
-        self.create = create
+    def __init__(self, arg: Expr, create: bool):
+        super().__init__(arg)
+        self._create = create
 
     def __repr__(self):
-        return ("+" if self.create else "-") + \
-            opnd_repr_right(self, self.opnd)
+        return ("+" if self._create else "-") + \
+            opnd_repr_right(self, self._arg)
 
 
-class OpenOp(Op, EntityOpnd, RelationOpnd, CastingOpnd, OpeningOpnd):
-    """An operation binding a role name or casting to a relation"""
+class OpenOp(BinaryOp):
+    """An operation "opening" a role name with a relation"""
+
+    @staticmethod
+    def args_are_valid(left, right):
+        """Check the operation arguments are valid"""
+        return (
+            isinstance(left, Expr) and isinstance(right, Expr) and
+            left._graph is right._graph and
+            (
+                isinstance(left._right_atom, RelationAtom) and
+                isinstance(right._left_atom, RoleAtom) or
+                isinstance(left._right_atom, RoleAtom) and
+                isinstance(right._left_atom, RelationAtom)
+            )
+        )
+
     def __init__(self, left, right):
-        def opnds_are_valid(x, y):
-            return isinstance(x, DirectorOpnd) and \
-                isinstance(y, (ActorOpnd, RoleOpnd))
-        assert opnds_are_valid(left, right) or opnds_are_valid(right, left)
-        assert left.graph is right.graph
-        super().__init__(left.graph)
-        self.left = left
-        self.right = right
+        assert OpenOp.args_are_valid(left, right)
+        super().__init__(left, right)
 
     def __repr__(self):
-        return opnd_repr_left(self.left, self) + " * " + \
-            opnd_repr_right(self, self.right)
+        return opnd_repr_left(self._left, self) + " * " + \
+            opnd_repr_right(self, self._right)
 
 
-class CastOp(Op, EntityOpnd, RelationOpnd, CastingOpnd, OpeningOpnd):
-    """An operation (re)binding a role name or opening to an actor element"""
+class CastOp(BinaryOp):
+    """An operation "casting" an element for a role"""
+
+    @staticmethod
+    def args_are_valid(left, right):
+        """Check the operation arguments are valid"""
+        return (
+            isinstance(left, Expr) and isinstance(right, Expr) and
+            left._graph is right._graph and
+            (
+                isinstance(left._right_atom, ElementAtom) and
+                isinstance(right._left_atom, RoleAtom) or
+                isinstance(left._right_atom, RoleAtom) and
+                isinstance(right._left_atom, ElementAtom)
+            )
+        )
+
     def __init__(self, left, right):
-        def opnds_are_valid(x, y):
-            return isinstance(x, ActorOpnd) and \
-                isinstance(y, (DirectorOpnd, RoleOpnd))
-        assert opnds_are_valid(left, right) or opnds_are_valid(right, left)
-        assert left.graph is right.graph
-        super().__init__(left.graph)
-        self.left = left
-        self.right = right
+        assert CastOp.args_are_valid(left, right)
+        super().__init__(left, right)
 
     def __repr__(self):
-        return opnd_repr_left(self.left, self) + " - " + \
-            opnd_repr_right(self, self.right)
+        return opnd_repr_left(self._left, self) + " - " + \
+            opnd_repr_right(self, self._right)
 
 
-# Precedence of operands - lower precedence first
-OPND_TYPE_PRECEDENCE = [
+# Precedence of expressions - lower precedence first
+EXPR_TYPE_PRECEDENCE = [
     CastOp,
     OpenOp,
     SetCreationOp,
     UpdateOp,
-    Opnd,
+    Atom,
 ]
 
-def opnd_type_get_precedence(opnd_type: type) -> int:
-    """Get operand type precedence (lower precedence - lower number)"""
-    assert isinstance(opnd_type, type)
-    assert issubclass(opnd_type, Opnd)
-    # Return the precedence index of the type closest to the operand type
-    mro = opnd_type.__mro__
+
+def expr_type_get_precedence(expr_type: type) -> int:
+    """Get expression type precedence (lower precedence - lower number)"""
+    assert isinstance(expr_type, type)
+    assert issubclass(expr_type, Expr)
+    # Return the precedence index of the type closest to the expression type
+    mro = expr_type.__mro__
     return min(
-        enumerate(OPND_TYPE_PRECEDENCE),
+        enumerate(EXPR_TYPE_PRECEDENCE),
         default=(-1, object),
         # Use inheritance distance from type as the key
         key=lambda x: mro.index(x[1]) if x[1] in mro else math.inf
     )[0]
 
 
-def opnd_get_precedence(opnd: Opnd) -> int:
-    """Get operand instance precedence (lower precedence - lower number)"""
-    assert isinstance(opnd, Opnd)
-    return opnd_type_get_precedence(type(opnd))
+def expr_get_precedence(expr: Expr) -> int:
+    """Get expression precedence (lower precedence - lower number)"""
+    assert isinstance(expr, Expr)
+    return expr_type_get_precedence(type(expr))
 
 
-def opnd_repr_right(op: Op, opnd: Opnd):
+def opnd_repr_right(op: Op, opnd: Expr):
     """
-    Enclose a string representation of an operand into parentheses, if it's
-    to the right of a higher- or same-precedence operator.
+    Enclose a string representation of an operand expression into parentheses,
+    if it's to the right of a higher- or same-precedence operator.
     """
-    expr = repr(opnd)
-    if opnd_get_precedence(op) >= opnd_get_precedence(opnd):
-        expr = "(" + expr + ")"
-    return expr
+    opnd_repr = repr(opnd)
+    if expr_get_precedence(op) >= expr_get_precedence(opnd):
+        opnd_repr = "(" + opnd_repr + ")"
+    return opnd_repr
 
 
-def opnd_repr_left(opnd: Opnd, op: Op):
+def opnd_repr_left(opnd: Expr, op: Op):
     """
-    Enclose a string representation of an operand into parentheses, if it's
-    to the left of a higher-precedence operator.
+    Enclose a string representation of an operand expression into parentheses,
+    if it's to the left of a higher-precedence operator.
     """
-    expr = repr(opnd)
-    if opnd_get_precedence(op) > opnd_get_precedence(opnd):
-        expr = "(" + expr + ")"
-    return expr
+    opnd_repr = repr(opnd)
+    if expr_get_precedence(op) > expr_get_precedence(opnd):
+        opnd_repr = "(" + opnd_repr + ")"
+    return opnd_repr
