@@ -114,11 +114,15 @@ def test_element_edge_element(e, r):
     assert repr(e - 'source' * r * 'target' - e) == \
         "e - 'source' * r * 'target' - e"
     assert repr(e << e) == "e - 'target' * r * 'source' - e"
+    assert repr(e - 'target' * r * 'source' - e) == \
+        "e - 'target' * r * 'source' - e"
 
 
 def test_element_edge_role(e, r):
     assert repr(e >> r) == "e - 'source' * r"
     assert repr(e << r) == "e - 'target' * r"
+    assert repr(r >> e) == "r * 'target' - e"
+    assert repr(r << e) == "r * 'source' - e"
 
 
 def test_element_edge_role_edge_element(e, r):
@@ -126,3 +130,26 @@ def test_element_edge_role_edge_element(e, r):
     assert repr((e >> r) >> e) == "(e - 'source' * r) * 'target' - e"
     assert repr(e >> r >> e) == "(e - 'source' * r) * 'target' - e"
     assert repr(e << r << e) == "(e - 'target' * r) * 'source' - e"
+
+
+def test_complex(e, r):
+    s = e.ll_state
+    t = r.ll_state_transition
+    assert repr(
+        (a := s.Advertising(comment='Device is an "advertiser"')) >> t >>
+        s.Standby(comment='No transmit/receive') >> t >> a
+    ) == \
+    "(" \
+        "(" \
+            "e.ll_state.Advertising(" \
+                "comment='Device is an \"advertiser\"'" \
+            ") - " \
+            "'source' * r.ll_state_transition" \
+        ") * 'target' - " \
+        "e.ll_state.Standby(comment='No transmit/receive') - " \
+        "'source' * r.ll_state_transition" \
+    ") * " \
+    "'target' - " \
+    "e.ll_state.Advertising(" \
+        "comment='Device is an \"advertiser\"'" \
+    ")"
