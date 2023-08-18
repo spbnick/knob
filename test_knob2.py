@@ -109,6 +109,14 @@ def test_element_casting_open(e, r):
     assert repr(r * ('role' - r)) == "r * ('role' - r)"
 
 
+def test_double_cast(e):
+    assert repr(e - 'role' - e) == "e - 'role' - e"
+
+
+def test_double_open(r):
+    assert repr(r * 'role' * r) == "r * 'role' * r"
+
+
 def test_element_edge_element(e, r):
     assert repr(e >> e) == "e - 'source' * r * 'target' - e"
     assert repr(e - 'source' * r * 'target' - e) == \
