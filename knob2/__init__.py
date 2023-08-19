@@ -24,6 +24,205 @@ class Graph:
         self.relation = RelationAtom(self)
 
 
+class AtomPattern(ABC):
+    """An abstract atom pattern evaluated from an expresion"""
+
+    @abstractmethod
+    def __repr__(self):
+        pass
+
+
+class ElementPattern(AtomPattern):
+    """An abstract element (relation or entity) pattern"""
+
+    def __init__(self, attrs: dict[str, object]):
+        """
+        Initialize the element pattern.
+
+        Args:
+            attrs:  The attribute dictionary.
+        """
+        self.attrs = attrs
+
+    @abstractmethod
+    def with_updated_attrs(self, attrs: dict[str, object]) -> \
+            'ElementPattern':
+        """Duplicate the pattern with attributes updated"""
+
+
+class EntityPattern(ElementPattern):
+    """An entity pattern"""
+
+    def __repr__(self):
+        return 'e' + str(id(self)) + (repr(self.attrs) if self.attrs else "")
+
+    def with_updated_attrs(self, attrs: dict[str, object]) -> \
+            'EntityPattern':
+        """Duplicate the pattern with attributes updated"""
+        return self, EntityPattern(self.attrs | attrs)
+
+
+class RelationPattern(ElementPattern):
+    """A relation pattern"""
+
+    def __init__(self,
+                 attrs: dict[str, object],
+                 roles: dict[str, ElementPattern]):
+        """
+        Initialize the relation pattern.
+
+        Args:
+            attrs:  The attribute dictionary.
+            roles:  The role dictionary.
+        """
+        super().__init__(attrs)
+        self.roles = roles
+
+    def __repr__(self):
+        return 'r' + str(id(self)) + \
+            (repr(self.attrs) if self.attrs or self.roles else "") + \
+            (repr(self.roles) if self.roles else "")
+
+    def with_updated_attrs(self, attrs: dict[str, object]) -> \
+            'RelationPattern':
+        """Duplicate the pattern with attributes updated"""
+        return self, RelationPattern(self.attrs | attrs, self.roles)
+
+    def with_updated_roles(self, roles: dict[str, EntityPattern]) -> \
+            'RelationPattern':
+        """Duplicate the pattern with roles updated"""
+        return self, RelationPattern(self.attrs, self.roles | roles)
+
+
+class RolePattern(AtomPattern):
+    """A role (unattached/opening/casting) pattern"""
+
+    def __init__(self, name: str, element: ElementPattern | None):
+        """
+        Initialize the role's attachment pattern.
+
+        Args:
+            name:       The name of the role.
+            element:    The element attached to the role, or None.
+        """
+        self.element = element
+        self.name = name
+
+    def __repr__(self):
+        return (
+            f"({self.name!r}" +
+            ("" if self.element is None else f": {self.element!r}") +
+            ")"
+        )
+
+    def with_element(self, element: ElementPattern) -> \
+            ForwardRef('RolePattern'):
+        """Create a duplicate with the element set"""
+        assert self.element is None
+        assert element is not None
+        return self, RolePattern(self.name, element)
+
+
+class GraphPattern:
+    """A (sub)graph pattern"""
+
+    def __init__(self,
+                 graph: Graph,
+                 elements: dict[ElementPattern, bool],
+                 left: AtomPattern,
+                 right: AtomPattern):
+        """
+        Initialize the graph pattern.
+
+        Args:
+            graph:      The supergraph of the graph this pattern is matching.
+            elements:   A dictionary of patterns matching elements
+                        (entities or relations) belonging to the subgraph, and
+                        one of the two values:
+                        * False, if the element pattern should be matched.
+                        * True, if all elements matching the (enumerable)
+                          pattern should be created unconditionally.
+                        Roles in any relation patterns contained in this
+                        dictionary can only reference entity patterns from the
+                        same dictionary.
+            left:       The left-side atom pattern to use when using the
+                        graph pattern on the right side of an operator.
+                        Must be, or refer to, an element in "elements".
+            right:      The right-side atom pattern to use when using the
+                        graph pattern on the left side of an operator.
+                        Must be, or refer to, an element in "elements".
+        """
+        entities = {
+            e: c
+            for e, c in elements.items() if isinstance(e, EntityPattern)
+        }
+        relations = {
+            e: c
+            for e, c in elements.items() if isinstance(e, RelationPattern)
+        }
+        assert set(entities) >= {
+            entity
+            for relation in relations
+            for entity in relation.roles.values()
+        }
+        assert isinstance(left, (RolePattern, ElementPattern))
+        assert isinstance(right, (RolePattern, ElementPattern))
+        left_element = \
+            left.element if isinstance(left, RolePattern) else left
+        right_element = \
+            right.element if isinstance(right, RolePattern) else right
+        assert left_element is None or left_element in elements
+        assert right_element is None or right_element in elements
+        self.graph = graph
+        self.elements = elements
+        self.entities = entities
+        self.relations = relations
+        self.left = left
+        self.right = right
+
+    def __repr__(self):
+        return f"{self.left!r} {self.elements!r} {self.right!r}"
+
+    def with_replaced_atom(self, old: AtomPattern, new: AtomPattern) -> \
+            ForwardRef('GraphPattern'):
+        """Create a duplicate graph pattern with an atom pattern replaced"""
+        assert old in {self.left, self.right}, \
+            "Replacing a non-interface atom pattern"
+        assert not isinstance(old, ElementPattern) or old in self.elements, \
+            "Replacing unknown element pattern"
+        assert isinstance(old, ElementPattern) <= \
+            isinstance(new, ElementPattern), \
+            "Cannot downgrade element pattern to a role pattern"
+
+        elements = self.elements.copy()
+        left = self.left
+        right = self.right
+
+        if isinstance(old, ElementPattern):
+            elements[new] = elements.pop(old)
+        if old is left:
+            left = new
+        if new is right:
+            right = new
+
+        return GraphPattern(self.graph, elements, left, right)
+
+    def __or__(self, other) -> ForwardRef('GraphPattern') | NotImplemented:
+        """Merge two graph patterns"""
+        if isinstance(other, GraphPattern) and other.graph is self.graph:
+            return GraphPattern(
+                self.graph,
+                {
+                    element: max(self.elements.get(element, False),
+                                 other.elements.get(element, False))
+                    for element in set(self.elements) | set(other.elements)
+                },
+                self.left,
+                other.right
+            )
+        return NotImplemented
+
+
 class Expr(ABC):
     """An expression (tree)"""
 
@@ -43,6 +242,10 @@ class Expr(ABC):
     @abstractmethod
     def __repr__(self):
         pass
+
+    @abstractmethod
+    def _eval(self) -> GraphPattern:
+        """Evaluate the expression to a graph pattern"""
 
     def __pos__(self):
         """Create a creation-enabling operator"""
@@ -178,6 +381,11 @@ class RoleAtom(Atom):
     def __repr__(self):
         return repr(self._name)
 
+    def _eval(self) -> GraphPattern:
+        """Evaluate the expression to a graph pattern"""
+        pattern = RolePattern(self._name, None)
+        return GraphPattern(self.graph, {}, pattern, pattern)
+
 
 class ElementAtom(Atom):
     """An element atom"""
@@ -189,12 +397,20 @@ class EntityAtom(ElementAtom):
     def __repr__(self):
         return "e"
 
+    def _eval(self):
+        pattern = EntityPattern({})
+        return GraphPattern(self._graph, {pattern: False}, pattern, pattern)
+
 
 class RelationAtom(ElementAtom):
     """A relation operand"""
 
     def __repr__(self):
         return "r"
+
+    def _eval(self):
+        pattern = RelationPattern({}, {})
+        return GraphPattern(self._graph, {pattern: False}, pattern, pattern)
 
 
 class Op(Expr):
@@ -257,6 +473,15 @@ class UpdateOp(UnaryOp):
             expr = "(" + expr + ")"
         return opnd_repr_left(self._arg, self) + expr
 
+    def _eval(self):
+        graph = self._arg._eval()
+        atom = graph.right
+        if not isinstance(atom, ElementPattern):
+            raise TypeError
+        return graph.with_replaced_atom(
+            *atom.with_updated_attrs(self._attrs)
+        )
+
 
 class SetCreationOp(UnaryOp):
     """An operation changing the operand's creation state"""
@@ -267,6 +492,18 @@ class SetCreationOp(UnaryOp):
     def __repr__(self):
         return ("+" if self._create else "-") + \
             opnd_repr_right(self, self._arg)
+
+    def _eval(self):
+        graph = self._arg._eval()
+        return GraphPattern(
+            graph.graph,
+            {
+                element: self._create
+                for element in graph.elements
+            },
+            graph.left,
+            graph.right
+        )
 
 
 class OpenOp(BinaryOp):
@@ -294,6 +531,43 @@ class OpenOp(BinaryOp):
         return opnd_repr_left(self._left, self) + " * " + \
             opnd_repr_right(self, self._right)
 
+    def _eval(self):
+        left_graph = self._left._eval()
+        right_graph = self._right._eval()
+        left_atom = left_graph.right
+        right_atom = right_graph.left
+
+        assert (
+            isinstance(left_atom, RelationPattern) and
+            isinstance(right_atom, RolePattern) or
+            isinstance(left_atom, RolePattern) and
+            isinstance(right_atom, RelationPattern)
+        )
+
+        # If the role is on the left
+        if isinstance(left_atom, RolePattern):
+            role = left_atom
+            relation = right_atom
+        # Else, the role is on the right
+        else:
+            relation = left_atom
+            role = right_atom
+
+        # If we're trying to open one role name with two relations
+        if isinstance(role.element, RelationPattern):
+            raise TypeError
+
+        # If we're opening a role with the relation
+        if role.element is None:
+            return (left_graph | right_graph).with_replaced_atom(
+                *role.with_element(relation)
+            )
+        # Else, we're completing a role
+        else:
+            return (left_graph | right_graph).with_replaced_atom(
+                *relation.with_updated_roles({role.name: role.element})
+            )
+
 
 class CastOp(BinaryOp):
     """An operation "casting" an element for a role"""
@@ -319,6 +593,43 @@ class CastOp(BinaryOp):
     def __repr__(self):
         return opnd_repr_left(self._left, self) + " - " + \
             opnd_repr_right(self, self._right)
+
+    def _eval(self):
+        left_graph = self._left._eval()
+        right_graph = self._right._eval()
+        left_atom = left_graph.right
+        right_atom = right_graph.left
+
+        assert (
+            isinstance(left_atom, ElementPattern) and
+            isinstance(right_atom, RolePattern) or
+            isinstance(left_atom, RolePattern) and
+            isinstance(right_atom, ElementPattern)
+        )
+
+        # If the role is on the left
+        if isinstance(left_atom, RolePattern):
+            role = left_atom
+            element = right_atom
+        # Else, the role is on the right
+        else:
+            element = left_atom
+            role = right_atom
+
+        # If we're trying to cast two entities in one role
+        if isinstance(role.element, EntityPattern):
+            raise TypeError
+
+        # If we're casting an element for the role
+        if role.element is None:
+            return (left_graph | right_graph).with_replaced_atom(
+                *role.with_element(element)
+            )
+        # Else, we're completing a role
+        else:
+            return (left_graph | right_graph).with_replaced_atom(
+                *role.element.with_updated_roles({role.name: element})
+            )
 
 
 # Precedence of expressions - lower precedence first
