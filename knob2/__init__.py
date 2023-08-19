@@ -237,26 +237,25 @@ class BinaryOp(Op):
 
 class UpdateOp(UnaryOp):
     """An element attribute update operation"""
-    def __init__(self, element: Expr, attrs: dict[str, object]):
-        super().__init__(element)
-        self.element = element
-        self.attrs = attrs
+    def __init__(self, arg: Expr, attrs: dict[str, object]):
+        super().__init__(arg)
+        self._attrs = attrs
 
     def __repr__(self):
-        if set(self.attrs) == {""}:
-            if self.attrs[""].isidentifier():
-                expr = "." + self.attrs[""]
+        if set(self._attrs) == {""}:
+            if self._attrs[""].isidentifier():
+                expr = "." + self._attrs[""]
             else:
-                expr = "[" + repr(self.attrs[""]) + "]"
+                expr = "[" + repr(self._attrs[""]) + "]"
         else:
-            if all(k.isidentifier() for k in self.attrs):
+            if all(k.isidentifier() for k in self._attrs):
                 expr = ", ".join(
-                    k + "=" + repr(v) for k, v in self.attrs.items()
+                    k + "=" + repr(v) for k, v in self._attrs.items()
                 )
             else:
-                expr = "**" + repr(self.attrs)
+                expr = "**" + repr(self._attrs)
             expr = "(" + expr + ")"
-        return opnd_repr_left(self.element, self) + expr
+        return opnd_repr_left(self._arg, self) + expr
 
 
 class SetCreationOp(UnaryOp):
