@@ -665,3 +665,15 @@ The role-casting operator (`-`):
 The role-opening operator (`*`):
 
     relation * role
+---
+Replace element reference in role patterns
+
+So, we can replace an element pattern or a role pattern.
+
+We can replace a role pattern with any pattern, but not vice versa (whyyy?).
+We can replace an element pattern with an element pattern.
+If we're replacing an element, and it's referenced by a role pattern in a
+boundary, the role pattern should have its element updated.
+---
+Test boundary operators making patterns with appropriate create state.
+Test reference reuse

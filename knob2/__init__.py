@@ -5,7 +5,7 @@ NOTE: All binary graph operators are left-associative
 """
 
 import math
-from typing import ForwardRef
+from typing import Tuple
 from abc import ABC, abstractmethod
 
 # We're being abstract here,
@@ -24,8 +24,56 @@ class Graph:
         self.relation = RelationAtom(self)
 
 
+def abbr(x) -> str:
+    """
+    Produce an abbreviated representation of a value
+
+    Args:
+        x:  The value to produce an abbreviated representation for.
+            If the value has a callable attribute "__abbr__", then that will
+            be called to produce the abbreviated representation.
+            If the value is a dictionary, and all its keys are valid
+            identifiers, it will be formatted as kwargs, with values formatted
+            with abbr(), otherwise it will be formatted as a dictionary
+            constructor with both its keys and values formatted with abbr().
+            If the value is a set, list, or a tuple, its elements will be
+            formatted with abbr().
+            Otherwise repr() will be used.
+
+    Returns:
+        The abbreviated representation of the value.
+    """
+    # Oh, shut up, pylint: disable=too-many-return-statements
+    if callable(getattr(x, "__abbr__", None)):
+        return x.__abbr__()
+    if isinstance(x, dict):
+        if all(isinstance(k, str) and k.isidentifier() for k in x):
+            return "(" + ", ".join(
+                str(k) + "=" + abbr(v)
+                for k, v in x.items()
+            ) + ")"
+        else:
+            return "{" + ", ".join(
+                abbr(k) + ": " + abbr(v)
+                for k, v in x.items()
+            ) + "}"
+    if isinstance(x, set):
+        return "{" + ", ".join(abbr(e) for e in x) + "}"
+    if isinstance(x, list):
+        return "[" + ", ".join(abbr(e) for e in x) + "]"
+    if isinstance(x, tuple):
+        if len(x) == 1:
+            return "(" + abbr(x[0]) + ")"
+        return "(" + ", ".join(abbr(e) for e in x) + ")"
+    return repr(x)
+
+
 class AtomPattern(ABC):
     """An abstract atom pattern evaluated from an expresion"""
+
+    @abstractmethod
+    def __abbr__(self):
+        pass
 
     @abstractmethod
     def __repr__(self):
@@ -35,6 +83,9 @@ class AtomPattern(ABC):
 class ElementPattern(AtomPattern):
     """An abstract element (relation or entity) pattern"""
 
+    # The tuple of the names of implicit attributes in order of nesting
+    IMPLICIT_ATTRS: Tuple[str, ...] = ("_type",)
+
     def __init__(self, attrs: dict[str, object]):
         """
         Initialize the element pattern.
@@ -42,22 +93,52 @@ class ElementPattern(AtomPattern):
         Args:
             attrs:  The attribute dictionary.
         """
+        # The ID of the element inside its graph pattern
+        self.id: None | int = None
+
+        # Substitute implicit attrs
+        if "" in attrs:
+            for implicit_attr in self.IMPLICIT_ATTRS:
+                if implicit_attr not in attrs:
+                    attrs[implicit_attr] = attrs.pop("")
+                    break
+            else:
+                raise NotImplementedError("Implicit attributes exhausted")
+
         self.attrs = attrs
+
+    def __repr__(self):
+        result = abbr(self)
+        explicit_attrs = self.attrs.copy()
+        for implicit_attr in self.IMPLICIT_ATTRS:
+            if implicit_attr not in explicit_attrs:
+                break
+            value = explicit_attrs.pop(implicit_attr)
+            if value.isidentifier():
+                result += f".{value}"
+            else:
+                result += f"[{value!r}]"
+        if explicit_attrs:
+            result += abbr(explicit_attrs)
+        return result
 
     @abstractmethod
     def with_updated_attrs(self, attrs: dict[str, object]) -> \
-            'ElementPattern':
+            Tuple['ElementPattern', 'ElementPattern']:
         """Duplicate the pattern with attributes updated"""
 
 
 class EntityPattern(ElementPattern):
     """An entity pattern"""
 
-    def __repr__(self):
-        return 'e' + str(id(self)) + (repr(self.attrs) if self.attrs else "")
+    # The tuple of the names of implicit attributes in order of nesting
+    IMPLICIT_ATTRS = ElementPattern.IMPLICIT_ATTRS + ("_name",)
+
+    def __abbr__(self):
+        return 'e' if self.id is None else f'e{self.id}'
 
     def with_updated_attrs(self, attrs: dict[str, object]) -> \
-            'EntityPattern':
+            Tuple['EntityPattern', 'EntityPattern']:
         """Duplicate the pattern with attributes updated"""
         return self, EntityPattern(self.attrs | attrs)
 
@@ -78,49 +159,125 @@ class RelationPattern(ElementPattern):
         super().__init__(attrs)
         self.roles = roles
 
+    def __abbr__(self):
+        return 'r' if self.id is None else f'r{self.id}'
+
     def __repr__(self):
-        return 'r' + str(id(self)) + \
-            (repr(self.attrs) if self.attrs or self.roles else "") + \
-            (repr(self.roles) if self.roles else "")
+        return super().__repr__() + \
+            (f":{abbr(self.roles)}" if self.roles else "")
 
     def with_updated_attrs(self, attrs: dict[str, object]) -> \
-            'RelationPattern':
+            Tuple['RelationPattern', 'RelationPattern']:
         """Duplicate the pattern with attributes updated"""
         return self, RelationPattern(self.attrs | attrs, self.roles)
 
     def with_updated_roles(self, roles: dict[str, EntityPattern]) -> \
-            'RelationPattern':
+            Tuple['RelationPattern', 'RelationPattern']:
         """Duplicate the pattern with roles updated"""
         return self, RelationPattern(self.attrs, self.roles | roles)
 
 
 class RolePattern(AtomPattern):
-    """A role (unattached/opening/casting) pattern"""
+    """A role pattern"""
 
-    def __init__(self, name: str, element: ElementPattern | None):
+    def __init__(self, name: str, element: None | ElementPattern):
         """
-        Initialize the role's attachment pattern.
+        Initialize the role pattern.
 
         Args:
             name:       The name of the role.
             element:    The element attached to the role, or None.
         """
-        self.element = element
         self.name = name
+        self.element = element
+
+
+class DetachedRolePattern(RolePattern):
+    """An unattached role pattern"""
+
+    def __init__(self, name: str):
+        """
+        Initialize the role pattern.
+
+        Args:
+            name:       The name of the role.
+        """
+        super().__init__(name, None)
+
+    def __abbr__(self):
+        return repr(self.name)
 
     def __repr__(self):
-        return (
-            f"({self.name!r}" +
-            ("" if self.element is None else f": {self.element!r}") +
-            ")"
-        )
+        return repr(self.name)
 
-    def with_element(self, element: ElementPattern) -> \
-            ForwardRef('RolePattern'):
-        """Create a duplicate with the element set"""
-        assert self.element is None
-        assert element is not None
-        return self, RolePattern(self.name, element)
+    def open(self, relation: RelationPattern) -> \
+            Tuple['DetachedRolePattern', 'OpeningPattern']:
+        """Open the role with a relationship"""
+        return self, OpeningPattern(relation, self.name)
+
+    def cast(self, element: ElementPattern) -> \
+            Tuple['DetachedRolePattern', 'CastingPattern']:
+        """Cast an element with the role"""
+        return self, CastingPattern(self.name, element)
+
+
+class AttachedRolePattern(RolePattern):
+    """An attached (opened/cast) role pattern"""
+
+    def __init__(self, name: str, element: ElementPattern):
+        """
+        Initialize the attached role pattern.
+
+        Args:
+            name:       The name of the role.
+            element:    The element attached to the role.
+        """
+        assert isinstance(element, ElementPattern)
+        super().__init__(name, element)
+
+    @abstractmethod
+    def with_replaced_element(self, element: ElementPattern) -> \
+            'AttachedRolePattern':
+        """Create a new attached pattern with the element replaced"""
+
+
+class CastingPattern(AttachedRolePattern):
+    """A role casting (an element acting a role) pattern"""
+
+    def __abbr__(self):
+        return f"{self.name!r}-{abbr(self.element)}"
+
+    def __repr__(self):
+        return f"{self.name!r}-{self.element!r}"
+
+    def with_replaced_element(self, element: ElementPattern) -> \
+            'CastingPattern':
+        return CastingPattern(self.name, element)
+
+
+class OpeningPattern(AttachedRolePattern):
+    """A role opening (a relationship's open role) pattern"""
+
+    def __init__(self, relation: RelationPattern, name: str):
+        """
+        Initialize the opening pattern.
+
+        Args:
+            relation:   The relation with the role open.
+            name:       The name of the role.
+        """
+        super().__init__(name, relation)
+
+    def __abbr__(self):
+        return f"{abbr(self.element)}*{self.name!r}"
+
+    def __repr__(self):
+        return f"{self.element!r}*{self.name!r}"
+
+    def with_replaced_element(self, element: ElementPattern) -> \
+            'OpeningPattern':
+        assert isinstance(element, RelationPattern)
+        return OpeningPattern(element, self.name)
 
 
 class GraphPattern:
@@ -160,66 +317,97 @@ class GraphPattern:
             e: c
             for e, c in elements.items() if isinstance(e, RelationPattern)
         }
-        assert set(entities) >= {
-            entity
+        assert set(elements) >= {
+            element
             for relation in relations
-            for entity in relation.roles.values()
-        }
-        assert isinstance(left, (RolePattern, ElementPattern))
-        assert isinstance(right, (RolePattern, ElementPattern))
-        left_element = \
-            left.element if isinstance(left, RolePattern) else left
-        right_element = \
-            right.element if isinstance(right, RolePattern) else right
-        assert left_element is None or left_element in elements
-        assert right_element is None or right_element in elements
+            for element in relation.roles.values()
+        }, "A relation's role is played by an unknown element"
+
+        def get_atom_element(atom: AtomPattern):
+            return atom.element if isinstance(atom, RolePattern) else atom
+
+        left_element = get_atom_element(left)
+        right_element = get_atom_element(right)
+        assert left_element is None or left_element in elements, \
+            "Unknown left element (reference)"
+        assert right_element is None or right_element in elements, \
+            "Unknown right element (reference)"
+
         self.graph = graph
         self.elements = elements
         self.entities = entities
         self.relations = relations
         self.left = left
         self.right = right
+        # Assign IDs to entities and relations
+        for i, entity in enumerate(self.entities):
+            entity.id = i
+        for i, relation in enumerate(self.relations):
+            relation.id = i
+
+    def __abbr__(self):
+        return f"{self.left!r} {...} {self.right!r}"
 
     def __repr__(self):
-        return f"{self.left!r} {self.elements!r} {self.right!r}"
+        if isinstance(self.left, OpeningPattern):
+            left = f"{self.left.name!r}*{abbr(self.left.element)}"
+        elif isinstance(self.left, CastingPattern):
+            left = f"{self.left.name!r}-{abbr(self.left.element)}"
+        else:
+            left = abbr(self.left)
+
+        if isinstance(self.right, OpeningPattern):
+            right = f"{abbr(self.right.element)}*{self.right.name!r}"
+        elif isinstance(self.right, CastingPattern):
+            right = f"{abbr(self.right.element)}-{self.right.name!r}"
+        else:
+            right = abbr(self.right)
+
+        return f"{left} < " + ", ".join(
+            ("", "+")[c] + repr(e) for e, c in self.elements.items()
+        ) + f" > {right}"
 
     def with_replaced_atom(self, old: AtomPattern, new: AtomPattern) -> \
-            ForwardRef('GraphPattern'):
+            'GraphPattern':
         """Create a duplicate graph pattern with an atom pattern replaced"""
-        assert old in {self.left, self.right}, \
-            "Replacing a non-interface atom pattern"
         assert not isinstance(old, ElementPattern) or old in self.elements, \
             "Replacing unknown element pattern"
         assert isinstance(old, ElementPattern) <= \
             isinstance(new, ElementPattern), \
             "Cannot downgrade element pattern to a role pattern"
 
-        elements = self.elements.copy()
-        left = self.left
-        right = self.right
+        def update_elements(elements, old, new):
+            if isinstance(old, ElementPattern) and \
+                    isinstance(new, ElementPattern):
+                elements = elements.copy()
+                elements[new] = elements.pop(old)
+            return elements
 
-        if isinstance(old, ElementPattern):
-            elements[new] = elements.pop(old)
-        if old is left:
-            left = new
-        if new is right:
-            right = new
+        def update_boundary(boundary, old, new):
+            if old is boundary:
+                return new
+            elif isinstance(boundary, AttachedRolePattern) and \
+                    boundary.element is old:
+                assert isinstance(new, ElementPattern)
+                return boundary.with_replaced_element(new)
+            return boundary
 
-        return GraphPattern(self.graph, elements, left, right)
+        return GraphPattern(
+            self.graph,
+            update_elements(self.elements, old, new),
+            update_boundary(self.left, old, new),
+            update_boundary(self.right, old, new),
+        )
 
-    def __or__(self, other) -> ForwardRef('GraphPattern') | NotImplemented:
+    def __or__(self, other) -> 'GraphPattern':
         """Merge two graph patterns"""
         if isinstance(other, GraphPattern) and other.graph is self.graph:
-            return GraphPattern(
-                self.graph,
-                {
-                    element: max(self.elements.get(element, False),
-                                 other.elements.get(element, False))
-                    for element in set(self.elements) | set(other.elements)
-                },
-                self.left,
-                other.right
-            )
+            elements = self.elements.copy()
+            for element, create in other.elements.items():
+                if element in elements:
+                    create = max(elements[element], create)
+                elements[element] = create
+            return GraphPattern(self.graph, elements, self.left, other.right)
         return NotImplemented
 
 
@@ -259,21 +447,21 @@ class Expr(ABC):
         """Create an implicit attribute update operator"""
         if isinstance(self._right_atom, ElementAtom):
             return UpdateOp(self, {"": key})
-        return NotImplemented
+        raise ValueError
 
-    def __getitem__(self, key) -> ForwardRef('UpdateOp') | NotImplemented:
+    def __getitem__(self, key) -> 'UpdateOp':
         """Create an implicit attribute update operator"""
         if isinstance(self._right_atom, ElementAtom) and isinstance(key, str):
             return UpdateOp(self, {"": key})
-        return NotImplemented
+        raise ValueError
 
-    def __call__(self, **attrs) -> ForwardRef('UpdateOp'):
+    def __call__(self, **attrs) -> 'UpdateOp':
         """Create an attribute update operator"""
         if isinstance(self._right_atom, ElementAtom):
             return UpdateOp(self, attrs)
-        return NotImplemented
+        raise ValueError
 
-    def __sub__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+    def __sub__(self, other) -> 'CastOp':
         """Create a role-casting operator for S - O expression """
         if isinstance(other, str):
             other = RoleAtom(self._graph, other)
@@ -281,7 +469,7 @@ class Expr(ABC):
             return CastOp(self, other)
         return NotImplemented
 
-    def __rsub__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+    def __rsub__(self, other) -> 'CastOp':
         """Create a role-casting operator for O - S expression """
         if isinstance(other, str):
             other = RoleAtom(self._graph, other)
@@ -289,7 +477,7 @@ class Expr(ABC):
             return CastOp(other, self)
         return NotImplemented
 
-    def __mul__(self, other) -> ForwardRef('OpenOp') | NotImplemented:
+    def __mul__(self, other) -> 'OpenOp':
         """Create a role-opening operator for S * O expression """
         if isinstance(other, str):
             other = RoleAtom(self._graph, other)
@@ -297,7 +485,7 @@ class Expr(ABC):
             return OpenOp(self, other)
         return NotImplemented
 
-    def __rmul__(self, other) -> ForwardRef('OpenOp') | NotImplemented:
+    def __rmul__(self, other) -> 'OpenOp':
         """Create a role-opening operator for O * S expression """
         if isinstance(other, str):
             other = RoleAtom(self._graph, other)
@@ -306,7 +494,7 @@ class Expr(ABC):
         return NotImplemented
 
     @staticmethod
-    def __shift(left, op, right) -> ForwardRef('CastOp') | NotImplemented:
+    def __shift(left, op, right) -> 'CastOp':
         """Create an expression for a shift operator"""
         # No it's not, pylint: disable=too-many-return-statements
         assert op in {"<<", ">>"}
@@ -342,19 +530,19 @@ class Expr(ABC):
 
         return NotImplemented
 
-    def __rshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+    def __rshift__(self, other) -> 'CastOp':
         """Create edge/role expression for S >> O expression"""
         return Expr.__shift(self, ">>", other)
 
-    def __rrshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+    def __rrshift__(self, other) -> 'CastOp':
         """Create edge/role expression for O >> S expression"""
         return Expr.__shift(other, ">>", self)
 
-    def __lshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+    def __lshift__(self, other) -> 'CastOp':
         """Create edge/role expression for S << O expression"""
         return Expr.__shift(self, "<<", other)
 
-    def __rlshift__(self, other) -> ForwardRef('CastOp') | NotImplemented:
+    def __rlshift__(self, other) -> 'CastOp':
         """Create edge/role expression for O << S expression"""
         return Expr.__shift(other, "<<", self)
 
@@ -383,8 +571,8 @@ class RoleAtom(Atom):
 
     def _eval(self) -> GraphPattern:
         """Evaluate the expression to a graph pattern"""
-        pattern = RolePattern(self._name, None)
-        return GraphPattern(self.graph, {}, pattern, pattern)
+        pattern = DetachedRolePattern(self._name)
+        return GraphPattern(self._graph, {}, pattern, pattern)
 
 
 class ElementAtom(Atom):
@@ -477,7 +665,7 @@ class UpdateOp(UnaryOp):
         graph = self._arg._eval()
         atom = graph.right
         if not isinstance(atom, ElementPattern):
-            raise TypeError
+            raise ValueError
         return graph.with_replaced_atom(
             *atom.with_updated_attrs(self._attrs)
         )
@@ -537,35 +725,38 @@ class OpenOp(BinaryOp):
         left_atom = left_graph.right
         right_atom = right_graph.left
 
+        # If we're trying to open an opening
+        if isinstance(left_atom, OpeningPattern) or \
+                isinstance(right_atom, OpeningPattern):
+            raise ValueError
+
         assert (
             isinstance(left_atom, RelationPattern) and
-            isinstance(right_atom, RolePattern) or
-            isinstance(left_atom, RolePattern) and
+            isinstance(right_atom, (DetachedRolePattern, CastingPattern)) or
+            isinstance(left_atom, (DetachedRolePattern, CastingPattern)) and
             isinstance(right_atom, RelationPattern)
         )
 
-        # If the role is on the left
-        if isinstance(left_atom, RolePattern):
-            role = left_atom
-            relation = right_atom
+        # If the relation is on the left
+        if isinstance(left_atom, RelationPattern):
+            relation = left_atom
+            role_or_casting = right_atom
         # Else, the role is on the right
         else:
-            relation = left_atom
-            role = right_atom
+            role_or_casting = left_atom
+            relation = right_atom
 
-        # If we're trying to open one role name with two relations
-        if isinstance(role.element, RelationPattern):
-            raise TypeError
-
-        # If we're opening a role with the relation
-        if role.element is None:
+        # If we're completing a role
+        if isinstance(role_or_casting, CastingPattern):
             return (left_graph | right_graph).with_replaced_atom(
-                *role.with_element(relation)
+                *relation.with_updated_roles(
+                    {role_or_casting.name: role_or_casting.element}
+                )
             )
-        # Else, we're completing a role
+        # Else, we're opening a role with the relation
         else:
             return (left_graph | right_graph).with_replaced_atom(
-                *relation.with_updated_roles({role.name: role.element})
+                *role_or_casting.open(relation)
             )
 
 
@@ -600,35 +791,49 @@ class CastOp(BinaryOp):
         left_atom = left_graph.right
         right_atom = right_graph.left
 
+        print("left_graph:", left_graph)
+        print("right_graph:", right_graph)
+        print("left_atom:", left_atom)
+        print("right_atom:", right_atom)
+
+        # If we're trying to cast a casting
+        if isinstance(left_atom, CastingPattern) or \
+                isinstance(right_atom, CastingPattern):
+            raise ValueError
+
         assert (
             isinstance(left_atom, ElementPattern) and
-            isinstance(right_atom, RolePattern) or
-            isinstance(left_atom, RolePattern) and
+            isinstance(right_atom, (DetachedRolePattern, OpeningPattern)) or
+            isinstance(left_atom, (DetachedRolePattern, OpeningPattern)) and
             isinstance(right_atom, ElementPattern)
         )
 
-        # If the role is on the left
-        if isinstance(left_atom, RolePattern):
-            role = left_atom
-            element = right_atom
-        # Else, the role is on the right
-        else:
+        # If the element is on the left
+        if isinstance(left_atom, ElementPattern):
             element = left_atom
-            role = right_atom
+            role_or_opening = right_atom
+        # Else, the element is on the right
+        else:
+            role_or_opening = left_atom
+            element = right_atom
 
-        # If we're trying to cast two entities in one role
-        if isinstance(role.element, EntityPattern):
-            raise TypeError
+        print("merged_graph:", left_graph | right_graph)
 
-        # If we're casting an element for the role
-        if role.element is None:
+        # If we're completing a role
+        if isinstance(role_or_opening, OpeningPattern):
+            print("replacement:",
+                  role_or_opening.element.with_updated_roles(
+                      {role_or_opening.name: element}
+                  ))
             return (left_graph | right_graph).with_replaced_atom(
-                *role.with_element(element)
+                *role_or_opening.element.with_updated_roles(
+                    {role_or_opening.name: element}
+                )
             )
-        # Else, we're completing a role
+        # Else, we're casting an element for the role
         else:
             return (left_graph | right_graph).with_replaced_atom(
-                *role.element.with_updated_roles({role.name: element})
+                *role_or_opening.cast(element)
             )
 
 
