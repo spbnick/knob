@@ -19,9 +19,15 @@ from abc import ABC, abstractmethod
 class Graph:
     """A graph"""
 
-    def __init__(self):
-        self.entity = EntityAtom(self)
-        self.relation = RelationAtom(self)
+    @property
+    def entity(self):
+        """A unique entity"""
+        return EntityAtom(self)
+
+    @property
+    def relation(self):
+        """A unique relation"""
+        return RelationAtom(self)
 
 
 def abbr(x) -> str:
