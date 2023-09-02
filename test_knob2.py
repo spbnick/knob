@@ -1,5 +1,11 @@
+"""Knob2 tests."""
 import pytest
 import knob2
+
+# Ah, come on, pylint: disable=invalid-name, redefined-outer-name
+# Boooring, pylint: disable=missing-function-docstring
+# It's not really protected, pylint: disable=protected-access
+# No, it's not, pylint: disable=pointless-statement
 
 
 @pytest.fixture
@@ -9,14 +15,26 @@ def g():
 
 
 @pytest.fixture
-def e(g):
-    """The graph's entity operand"""
+def e0(g):
+    """The first graph's entity atom operand"""
     return g.entity
 
 
 @pytest.fixture
-def r(g):
-    """The graph's relation operand"""
+def e1(g):
+    """The second graph's entity atom operand"""
+    return g.entity
+
+
+@pytest.fixture
+def r0(g):
+    """The first graph's relation atom operand"""
+    return g.relation
+
+
+@pytest.fixture
+def r1(g):
+    """The second graph's relation atom operand"""
     return g.relation
 
 
@@ -25,251 +43,266 @@ def reprs(expr):
     return repr(expr), repr(expr._eval())
 
 
-def test_element(e, r):
-    assert reprs(e) == ("e", "e0 < e0 > e0")
-    assert reprs(r) == ("r", "r0 < r0 > r0")
+def test_element(e0, r0):
+    assert reprs(e0) == ("e0", "e0 < e0 > e0")
+    assert reprs(r0) == ("r0", "r0 < r0 > r0")
 
 
-def test_element_set_creation(e, r):
-    assert reprs(+e) == ("+e", "e0 < +e0 > e0")
-    assert reprs(-e) == ("-e", "e0 < e0 > e0")
+def test_element_set_creation(e0, r0):
+    assert reprs(+e0) == ("+e0", "e0 < +e0 > e0")
+    assert reprs(-e0) == ("-e0", "e0 < e0 > e0")
 
-    assert reprs(+r) == ("+r", "r0 < +r0 > r0")
-    assert reprs(-r) == ("-r", "r0 < r0 > r0")
+    assert reprs(+r0) == ("+r0", "r0 < +r0 > r0")
+    assert reprs(-r0) == ("-r0", "r0 < r0 > r0")
 
 
-def test_element_update(e, r):
-    assert reprs(e(x=1)) == ("e(x=1)", "e0 < e0(x=1) > e0")
-    assert reprs(e(**{'foo bar': 'baz'})) == (
-        "e(**{'foo bar': 'baz'})",
+def test_element_update(e0, r0):
+    assert reprs(e0(x=1)) == ("e0(x=1)", "e0 < e0(x=1) > e0")
+    assert reprs(e0(**{'foo bar': 'baz'})) == (
+        "e0(**{'foo bar': 'baz'})",
         "e0 < e0{'foo bar': 'baz'} > e0"
     )
 
-    assert reprs(r(x=1)) == ("r(x=1)", "r0 < r0(x=1) > r0")
-    assert reprs(r(**{'foo bar': 'baz'})) == (
-        "r(**{'foo bar': 'baz'})",
+    assert reprs(r0(x=1)) == ("r0(x=1)", "r0 < r0(x=1) > r0")
+    assert reprs(r0(**{'foo bar': 'baz'})) == (
+        "r0(**{'foo bar': 'baz'})",
         "r0 < r0{'foo bar': 'baz'} > r0"
     )
 
 
-def test_element_update_set_creation(e, r):
-    assert reprs(+e(x=1)) == ("+e(x=1)", "e0 < +e0(x=1) > e0")
-    assert reprs(-e(x=1)) == ("-e(x=1)", "e0 < e0(x=1) > e0")
+def test_element_update_set_creation(e0, r0):
+    assert reprs(+e0(x=1)) == ("+e0(x=1)", "e0 < +e0(x=1) > e0")
+    assert reprs(-e0(x=1)) == ("-e0(x=1)", "e0 < e0(x=1) > e0")
 
-    assert reprs(+r(x=1)) == ("+r(x=1)", "r0 < +r0(x=1) > r0")
-    assert reprs(-r(x=1)) == ("-r(x=1)", "r0 < r0(x=1) > r0")
+    assert reprs(+r0(x=1)) == ("+r0(x=1)", "r0 < +r0(x=1) > r0")
+    assert reprs(-r0(x=1)) == ("-r0(x=1)", "r0 < r0(x=1) > r0")
 
 
-def test_element_getattr(e, r):
-    assert reprs(e.state) == ("e.state", "e0 < e0.state > e0")
-    assert reprs(e.state.idle) == (
-        "e.state.idle", "e0 < e0.state.idle > e0"
+def test_element_getattr(e0, r0):
+    assert reprs(e0.state) == ("e0.state", "e0 < e0.state > e0")
+    assert reprs(e0.state.idle) == (
+        "e0.state.idle", "e0 < e0.state.idle > e0"
     )
-    assert reprs(r.state) == ("r.state", "r0 < r0.state > r0")
+    assert reprs(r0.state) == ("r0.state", "r0 < r0.state > r0")
     with pytest.raises(NotImplementedError):
-        reprs(r.state.idle)
+        reprs(r0.state.idle)
 
 
-def test_element_getitem(e, r):
-    assert reprs(e['foo bar']) == ("e['foo bar']", "e0 < e0['foo bar'] > e0")
-    assert reprs(r['foo bar']) == ("r['foo bar']", "r0 < r0['foo bar'] > r0")
+def test_element_getitem(e0, r0):
+    assert reprs(e0['foo bar']) == ("e0['foo bar']", "e0 < e0['foo bar'] > e0")
+    assert reprs(r0['foo bar']) == ("r0['foo bar']", "r0 < r0['foo bar'] > r0")
 
 
-def test_element_getattr_set_creation(e, r):
-    assert reprs(+e.state) == ("+e.state", "e0 < +e0.state > e0")
-    assert reprs(-e.state) == ("-e.state", "e0 < e0.state > e0")
-    assert reprs(+r.state) == ("+r.state", "r0 < +r0.state > r0")
-    assert reprs(-r.state) == ("-r.state", "r0 < r0.state > r0")
+def test_element_getattr_set_creation(e0, r0):
+    assert reprs(+e0.state) == ("+e0.state", "e0 < +e0.state > e0")
+    assert reprs(-e0.state) == ("-e0.state", "e0 < e0.state > e0")
+    assert reprs(+r0.state) == ("+r0.state", "r0 < +r0.state > r0")
+    assert reprs(-r0.state) == ("-r0.state", "r0 < r0.state > r0")
 
 
-def test_element_getitem_set_creation(e, r):
-    assert reprs(+e['foo bar']) == (
-        "+e['foo bar']",
+def test_element_getitem_set_creation(e0, r0):
+    assert reprs(+e0['foo bar']) == (
+        "+e0['foo bar']",
         "e0 < +e0['foo bar'] > e0"
     )
-    assert reprs(-e['foo bar']) == (
-        "-e['foo bar']",
+    assert reprs(-e0['foo bar']) == (
+        "-e0['foo bar']",
         "e0 < e0['foo bar'] > e0"
     )
-    assert reprs(+r['foo bar']) == (
-        "+r['foo bar']",
+    assert reprs(+r0['foo bar']) == (
+        "+r0['foo bar']",
         "r0 < +r0['foo bar'] > r0"
     )
-    assert reprs(-r['foo bar']) == (
-        "-r['foo bar']",
+    assert reprs(-r0['foo bar']) == (
+        "-r0['foo bar']",
         "r0 < r0['foo bar'] > r0"
     )
 
 
-def test_element_role_name_cast(e, r):
-    assert reprs(e - 'role') == ("e - 'role'", "e0 < e0 > e0-'role'")
-    assert reprs('role' - e) == ("'role' - e", "'role'-e0 < e0 > e0")
-    assert reprs(r - 'role') == ("r - 'role'", "r0 < r0 > r0-'role'")
-    assert reprs('role' - r) == ("'role' - r", "'role'-r0 < r0 > r0")
+def test_element_role_name_cast(e0, r0):
+    assert reprs(e0 - 'role') == ("e0 - 'role'", "e0 < e0 > e0-'role'")
+    assert reprs('role' - e0) == ("'role' - e0", "'role'-e0 < e0 > e0")
+    assert reprs(r0 - 'role') == ("r0 - 'role'", "r0 < r0 > r0-'role'")
+    assert reprs('role' - r0) == ("'role' - r0", "'role'-r0 < r0 > r0")
 
 
-def test_element_role_name_open(e, r):
+def test_element_role_name_open(e0, r0):
     with pytest.raises(TypeError):
-        _ = e * 'role'
+        _ = e0 * 'role'
     with pytest.raises(TypeError):
-        _ = 'role' * e
-    assert reprs(r * 'role') == ("r * 'role'", "r0 < r0 > r0*'role'")
-    assert reprs('role' * r) == ("'role' * r", "'role'*r0 < r0 > r0")
+        _ = 'role' * e0
+    assert reprs(r0 * 'role') == ("r0 * 'role'", "r0 < r0 > r0*'role'")
+    assert reprs('role' * r0) == ("'role' * r0", "'role'*r0 < r0 > r0")
 
 
-def test_element_opening_cast(e, r):
-    assert reprs(e - 'role' * r) == (
-        "e - 'role' * r",
+def test_element_opening_cast(e0, r0):
+    assert reprs(e0 - 'role' * r0) == (
+        "e0 - 'role' * r0",
         "e0 < e0, r0:(role=e0) > r0"
     )
-    assert reprs(e - 'ro le' * r) == (
-        "e - 'ro le' * r",
+    assert reprs(e0 - 'ro le' * r0) == (
+        "e0 - 'ro le' * r0",
         "e0 < e0, r0:{'ro le': e0} > r0"
     )
-    assert reprs(r * 'role' - e) == (
-        "r * 'role' - e",
+    assert reprs(r0 * 'role' - e0) == (
+        "r0 * 'role' - e0",
         "r0 < e0, r0:(role=e0) > e0"
     )
-    assert reprs(r * 'ro le' - e) == (
-        "r * 'ro le' - e",
+    assert reprs(r0 * 'ro le' - e0) == (
+        "r0 * 'ro le' - e0",
         "r0 < e0, r0:{'ro le': e0} > e0"
     )
 
 
-def test_element_casting_open(e, r):
-    assert reprs((e - 'role') * r) == (
-        "(e - 'role') * r",
+def test_element_casting_open(e0, r0, r1):
+    assert reprs((e0 - 'role') * r0) == (
+        "(e0 - 'role') * r0",
         "e0 < e0, r0:(role=e0) > r0"
     )
-    assert reprs(r * ('role' - e)) == (
-        "r * ('role' - e)",
+    assert reprs(r0 * ('role' - e0)) == (
+        "r0 * ('role' - e0)",
         "r0 < e0, r0:(role=e0) > e0"
     )
 
     with pytest.raises(TypeError):
-        (r - 'role') * e
+        (r0 - 'role') * e0
     with pytest.raises(TypeError):
-        e * ('role' - r)
+        e0 * ('role' - r0)
     with pytest.raises(TypeError):
-        (e - 'role') * e
+        (e0 - 'role') * e0
     with pytest.raises(TypeError):
-        e * ('role' - e)
+        e0 * ('role' - e0)
 
-    assert reprs((r - 'role') * r) == (
-        "(r - 'role') * r",
+    assert reprs((r0 - 'role') * r1) == (
+        "(r0 - 'role') * r1",
         "r0 < r0, r1:(role=r0) > r1"
     )
-    assert reprs(r * ('role' - r)) == (
-        "r * ('role' - r)",
-        "r1 < r0, r1:(role=r0) > r0"
+    assert reprs(r0 * ('role' - r1)) == (
+        "r0 * ('role' - r1)",
+        "r0 < r1, r0:(role=r1) > r1"
     )
 
-    assert reprs((r.x - 'role') * r.y) == (
-        "(r.x - 'role') * r.y",
+    assert reprs((r0.x - 'role') * r1.y) == (
+        "(r0.x - 'role') * r1.y",
         "r0 < r0.x, r1.y:(role=r0) > r1"
     )
-    assert reprs(r.x * ('role' - r.y)) == (
-        "r.x * ('role' - r.y)",
-        "r1 < r0.y, r1.x:(role=r0) > r0"
+    assert reprs(r0.x * ('role' - r1.y)) == (
+        "r0.x * ('role' - r1.y)",
+        "r0 < r1.y, r0.x:(role=r1) > r1"
     )
 
-    assert reprs((r.x(a=1) - 'role') * r.y(b=2)) == (
-        "(r.x(a=1) - 'role') * r.y(b=2)",
+    assert reprs((r0.x(a=1) - 'role') * r1.y(b=2)) == (
+        "(r0.x(a=1) - 'role') * r1.y(b=2)",
         "r0 < r0.x(a=1), r1.y(b=2):(role=r0) > r1"
     )
-    assert reprs(r.x(a=1) * ('role' - r.y(b=2))) == (
-        "r.x(a=1) * ('role' - r.y(b=2))",
-        "r1 < r0.y(b=2), r1.x(a=1):(role=r0) > r0"
+    assert reprs(r0.x(a=1) * ('role' - r1.y(b=2))) == (
+        "r0.x(a=1) * ('role' - r1.y(b=2))",
+        "r0 < r1.y(b=2), r0.x(a=1):(role=r1) > r1"
     )
 
 
-def test_double_cast(e):
-    assert repr(e - 'role' - e) == "e - 'role' - e"
+def test_double_cast(e0):
+    assert repr(e0 - 'role' - e0) == "e0 - 'role' - e0"
     with pytest.raises(ValueError):
-        (e - 'role' - e)._eval()
+        (e0 - 'role' - e0)._eval()
 
 
-def test_double_open(r):
-    assert repr(r * 'role' * r) == "r * 'role' * r"
+def test_double_open(r0):
+    assert repr(r0 * 'role' * r0) == "r0 * 'role' * r0"
     with pytest.raises(ValueError):
-        (r * 'role' * r)._eval()
+        (r0 * 'role' * r0)._eval()
 
 
-def test_element_edge_element(e, r):
-    assert reprs(e >> e) == (
-        "e - 'source' * r * 'target' - e",
+def test_element_edge_element(e0, e1, r0):
+    assert reprs(e0 >> e1) == (
+        "e0 - 'source' * r1 * 'target' - e1",
+        "e0 < e0, e1, r1:(source=e0, target=e1) > e1"
+    )
+    assert reprs(e0 - 'source' * r0 * 'target' - e1) == (
+        "e0 - 'source' * r0 * 'target' - e1",
         "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
     )
-    assert reprs(e - 'source' * r * 'target' - e) == (
-        "e - 'source' * r * 'target' - e",
-        "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
+    assert reprs(e0 << e1) == (
+        "e0 - 'target' * r2 * 'source' - e1",
+        "e0 < e0, e1, r2:(target=e0, source=e1) > e1"
     )
-    assert reprs(e << e) == (
-        "e - 'target' * r * 'source' - e",
-        "e0 < e0, e1, r0:(target=e0, source=e1) > e1"
-    )
-    assert reprs(e - 'target' * r * 'source' - e) == (
-        "e - 'target' * r * 'source' - e",
+    assert reprs(e0 - 'target' * r0 * 'source' - e1) == (
+        "e0 - 'target' * r0 * 'source' - e1",
         "e0 < e0, e1, r0:(target=e0, source=e1) > e1"
     )
 
 
-def test_element_edge_role(e, r):
-    assert reprs(e >> r) == (
-        "e - 'source' * r",
+def test_element_edge_role(e0, r0):
+    assert reprs(e0 >> r0) == (
+        "e0 - 'source' * r0",
         "e0 < e0, r0:(source=e0) > r0"
     )
-    assert reprs(e << r) == (
-        "e - 'target' * r",
+    assert reprs(e0 << r0) == (
+        "e0 - 'target' * r0",
         "e0 < e0, r0:(target=e0) > r0"
     )
-    assert reprs(r >> e) == (
-        "r * 'target' - e",
+    assert reprs(r0 >> e0) == (
+        "r0 * 'target' - e0",
         "r0 < e0, r0:(target=e0) > e0"
     )
-    assert reprs(r << e) == (
-        "r * 'source' - e",
+    assert reprs(r0 << e0) == (
+        "r0 * 'source' - e0",
         "r0 < e0, r0:(source=e0) > e0"
     )
 
 
-def test_element_edge_role_edge_element(e, r):
-    assert reprs(e >> (r >> e)) == (
-        "e - 'source' * (r * 'target' - e)",
+def test_element_edge_role_edge_element(e0, r0, e1):
+    assert reprs(e0 >> (r0 >> e1)) == (
+        "e0 - 'source' * (r0 * 'target' - e1)",
         "e0 < e0, e1, r0:(target=e1, source=e0) > e1"
     )
-    assert reprs((e >> r) >> e) == (
-        "(e - 'source' * r) * 'target' - e",
+    assert reprs((e0 >> r0) >> e1) == (
+        "(e0 - 'source' * r0) * 'target' - e1",
         "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
     )
-    assert reprs(e >> r >> e) == (
-        "(e - 'source' * r) * 'target' - e",
+    assert reprs(e0 >> r0 >> e1) == (
+        "(e0 - 'source' * r0) * 'target' - e1",
         "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
     )
-    assert reprs(e << r << e) == (
-        "(e - 'target' * r) * 'source' - e",
+    assert reprs(e0 << r0 << e1) == (
+        "(e0 - 'target' * r0) * 'source' - e1",
         "e0 < e0, e1, r0:(target=e0, source=e1) > e1"
     )
 
 
-def test_complex(e, r):
-    s = e.ll_state
-    t = r.ll_state_transition
-    assert repr(
-        (a := s.Advertising(comment='Device is an "advertiser"')) >> t >>
-        s.Standby(comment='No transmit/receive') >> t >> a
-    ) == \
-    "(" \
-        "(" \
-            "e.ll_state.Advertising(" \
-                "comment='Device is an \"advertiser\"'" \
-            ") - " \
-            "'source' * r.ll_state_transition" \
-        ") * 'target' - " \
-        "e.ll_state.Standby(comment='No transmit/receive') - " \
-        "'source' * r.ll_state_transition" \
-    ") * " \
-    "'target' - " \
-    "e.ll_state.Advertising(" \
-        "comment='Device is an \"advertiser\"'" \
-    ")"
+def test_refs(e0, e1, r0, r1):
+    assert e0
+    assert e1
+    assert r0
+    assert r1
+
+
+def test_complex(g):
+    assert reprs(
+        (a := g.entity.ll_state.Advertising(
+                comment='Device is an "advertiser"')) >>
+        g.relation.ll_state_transition >>
+        g.entity.ll_state.Standby(comment='No transmit/receive') >>
+        g.relation.ll_state_transition >> a
+    ) == (
+        "("
+            "("  # noqa: E131
+                "e0.ll_state.Advertising("  # noqa: E131
+                    "comment='Device is an \"advertiser\"'"  # noqa: E131
+                ") - "
+                "'source' * r0.ll_state_transition"
+            ") * 'target' - "
+            "e1.ll_state.Standby(comment='No transmit/receive') - "
+            "'source' * r1.ll_state_transition"
+        ") * "
+        "'target' - "
+        "e0.ll_state.Advertising("
+            "comment='Device is an \"advertiser\"'"
+        ")",
+        "e0 < "
+        "e0.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
+        "e1.ll_state.Standby(comment='No transmit/receive'), "
+        "r0.ll_state_transition:(source=e0, target=e1), "
+        "r1.ll_state_transition:(source=e1, target=e0) "
+        "> e0"
+    )

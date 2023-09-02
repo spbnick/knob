@@ -19,15 +19,26 @@ from abc import ABC, abstractmethod
 class Graph:
     """A graph"""
 
+    def __init__(self):
+        """Initialize the graph"""
+        # The ID next created entity atom will use
+        self.next_entity_id = 0
+        # The ID next created relation atom will use
+        self.next_relation_id = 0
+
     @property
     def entity(self):
         """A unique entity"""
-        return EntityAtom(self)
+        entity = EntityAtom(self, self.next_entity_id << 1)
+        self.next_entity_id += 1
+        return entity
 
     @property
     def relation(self):
         """A unique relation"""
-        return RelationAtom(self)
+        relation = RelationAtom(self, self.next_relation_id << 1 | 1)
+        self.next_relation_id += 1
+        return relation
 
 
 def abbr(x) -> str:
@@ -92,15 +103,16 @@ class ElementPattern(AtomPattern):
     # The tuple of the names of implicit attributes in order of nesting
     IMPLICIT_ATTRS: Tuple[str, ...] = ("_type",)
 
-    def __init__(self, attrs: dict[str, object]):
+    def __init__(self, atom: 'ElementAtom', attrs: dict[str, object]):
         """
         Initialize the element pattern.
 
         Args:
+            atom:   The element atom expression this pattern was created from.
             attrs:  The attribute dictionary.
         """
-        # The ID of the element inside its graph pattern
-        self.id: None | int = None
+        # The element atom expression this pattern was created from
+        self.atom = atom
 
         # Substitute implicit attrs
         if "" in attrs:
@@ -112,6 +124,14 @@ class ElementPattern(AtomPattern):
                 raise NotImplementedError("Implicit attributes exhausted")
 
         self.attrs = attrs
+
+    def __hash__(self):
+        return hash(self.atom)
+
+    def __eq__(self, other):
+        if isinstance(other, ElementPattern):
+            return self.atom == other.atom
+        return NotImplemented
 
     def __repr__(self):
         result = abbr(self)
@@ -140,33 +160,52 @@ class EntityPattern(ElementPattern):
     # The tuple of the names of implicit attributes in order of nesting
     IMPLICIT_ATTRS = ElementPattern.IMPLICIT_ATTRS + ("_name",)
 
+    def __init__(self, atom: 'EntityAtom', attrs: dict[str, object]):
+        """
+        Initialize the entity pattern.
+
+        Args:
+            atom:   The entity atom expression this pattern was created from.
+            attrs:  The attribute dictionary.
+        """
+        assert isinstance(atom, EntityAtom)
+        super().__init__(atom, attrs)
+        # Make mypy happy
+        self.atom: EntityAtom = atom
+
     def __abbr__(self):
-        return 'e' if self.id is None else f'e{self.id}'
+        return repr(self.atom)
 
     def with_updated_attrs(self, attrs: dict[str, object]) -> \
             Tuple['EntityPattern', 'EntityPattern']:
         """Duplicate the pattern with attributes updated"""
-        return self, EntityPattern(self.attrs | attrs)
+        return self, EntityPattern(self.atom, self.attrs | attrs)
 
 
 class RelationPattern(ElementPattern):
     """A relation pattern"""
 
     def __init__(self,
+                 atom: 'RelationAtom',
                  attrs: dict[str, object],
                  roles: dict[str, ElementPattern]):
         """
         Initialize the relation pattern.
 
         Args:
+            atom:   The relation atom expression this pattern was created
+                    from.
             attrs:  The attribute dictionary.
             roles:  The role dictionary.
         """
-        super().__init__(attrs)
+        assert isinstance(atom, RelationAtom)
+        super().__init__(atom, attrs)
+        # Make mypy happy
+        self.atom: RelationAtom = atom
         self.roles = roles
 
     def __abbr__(self):
-        return 'r' if self.id is None else f'r{self.id}'
+        return repr(self.atom)
 
     def __repr__(self):
         return super().__repr__() + \
@@ -175,12 +214,14 @@ class RelationPattern(ElementPattern):
     def with_updated_attrs(self, attrs: dict[str, object]) -> \
             Tuple['RelationPattern', 'RelationPattern']:
         """Duplicate the pattern with attributes updated"""
-        return self, RelationPattern(self.attrs | attrs, self.roles)
+        return self, \
+            RelationPattern(self.atom, self.attrs | attrs, self.roles)
 
     def with_updated_roles(self, roles: dict[str, EntityPattern]) -> \
             Tuple['RelationPattern', 'RelationPattern']:
         """Duplicate the pattern with roles updated"""
-        return self, RelationPattern(self.attrs, self.roles | roles)
+        return self, \
+            RelationPattern(self.atom, self.attrs, self.roles | roles)
 
 
 class RolePattern(AtomPattern):
@@ -345,11 +386,6 @@ class GraphPattern:
         self.relations = relations
         self.left = left
         self.right = right
-        # Assign IDs to entities and relations
-        for i, entity in enumerate(self.entities):
-            entity.id = i
-        for i, relation in enumerate(self.relations):
-            relation.id = i
 
     def __abbr__(self):
         return f"{self.left!r} {...} {self.right!r}"
@@ -516,7 +552,7 @@ class Expr(ABC):
 
         if isinstance(left_atom, EntityAtom) and \
            isinstance(right_atom, EntityAtom):
-            relation = RelationAtom(left._graph)
+            relation = left._graph.relation
             if ltr:
                 return left - "source" * relation * "target" - right
             else:
@@ -584,15 +620,37 @@ class RoleAtom(Atom):
 class ElementAtom(Atom):
     """An element atom"""
 
+    # Relax, pylint: disable=redefined-builtin
+    def __init__(self, graph: Graph, id: int):
+        """
+        Initialize the element atom.
+
+        Args:
+            graph:  The graph the element belongs to.
+            id:     The integer the element is identified by within its graph.
+        """
+        assert isinstance(graph, Graph)
+        assert isinstance(id, int)
+        super().__init__(graph)
+        self.id = id
+
+    def __hash__(self):
+        return self.id
+
+    def __eq__(self, other):
+        if isinstance(other, ElementAtom):
+            return self.id == other.id
+        return NotImplemented
+
 
 class EntityAtom(ElementAtom):
     """An entity operand"""
 
     def __repr__(self):
-        return "e"
+        return f"e{self.id >> 1}"
 
     def _eval(self):
-        pattern = EntityPattern({})
+        pattern = EntityPattern(self, {})
         return GraphPattern(self._graph, {pattern: False}, pattern, pattern)
 
 
@@ -600,10 +658,10 @@ class RelationAtom(ElementAtom):
     """A relation operand"""
 
     def __repr__(self):
-        return "r"
+        return f"r{self.id >> 1}"
 
     def _eval(self):
-        pattern = RelationPattern({}, {})
+        pattern = RelationPattern(self, {}, {})
         return GraphPattern(self._graph, {pattern: False}, pattern, pattern)
 
 

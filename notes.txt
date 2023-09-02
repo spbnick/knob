@@ -677,3 +677,110 @@ boundary, the role pattern should have its element updated.
 ---
 Test boundary operators making patterns with appropriate create state.
 Test reference reuse
+---
+So, references. How do they work?
+
+We need to be able to distinguish creating a new pattern from reusing a
+pattern.
+
+How about we identify them by the expression instance (object)? Same
+expression instance would be matching the same element? So, every time we
+apply an operation to an expression, we change the element's identity?
+
+Is that what we would always want? Or should we make reference creation
+explicit? And e.g. have an operator for that? What are the remaining unary
+operators? The `~`? If we have a special operator for that, what would it mean
+to reference an expression?
+
+If we equate expression instance with element reference, then what about
+having references to two identically-looking expressions? Wouldn't that be
+confusing?
+
+E.g.:
+
+(x := +e) >> (y := +e) >> x
+
+Waaait, wouldn't all this mean that two different instances of identical
+expressions have to match *different* elements? Ugh, it looks like that.
+And then we would have to always reference an expression to match the same
+element. But... isn't that... OK? Hmm, it could be OK.
+Ugh, let's just wait and see.
+
+Sooo, OK, how do we figure out this reference merging? Let's say when we merge
+graph patterns with the `|` operator, we would have to deduplicate the
+elements coming from reused instances. Would that do the right thing?
+
+Eeeeehhh.... we could tryyyyy thaaat?
+
+So, what if the same expression went through evaluation of completely
+different expressions on top of it, and then we merge the resulting graph
+patterns? What if there are conflicts? Ooooh, it's a whole new can of worms!
+
+Conflicts should probably be on the user - we just won't match anything.
+---
+OK, let's try to think how we can deduplicate patterns generated from reused
+expressions during merging of the graphs.
+
+OK, when we evaluate an expression we produce a pattern matching (attempting
+to match) a subgraph. The whole pattern is inside the `elements` array. Let's
+say we can disregard the left/right boundary elements, as they're used for
+evaluation and building up the pattern, and whatever RolePattern is used
+there, it's not considered a part of the graph pattern. Maybe that will turn
+out to be wrong, but let's start with that.
+
+So, what would it mean to merge two patterns like that? Up till now we just
+assumed that the two merged patterns do not share any edges or elements, but
+now we have to assume they do. Let's say we simply do not add elements
+(entities/edges) that already existing in the left graph pattern. What do we
+do if e.g. the shared relation has a role played by different elements in
+the two merged graphs? E.g. because one of them was updated by expressions on
+top?
+
+Should we decide based on expression depth? That seems somewhat arbitrary and
+difficult to keep track of.
+
+Perhaps we should just combine the conflicting roles and let the pattern match
+nothing (or fail to create)?
+
+Let's start with that.
+
+OK, now each element in the element dictionary would need to contain a list of
+expression objects it was evaluated from, say, latest-first.
+
+Wait, how do we match specific element to specific element based on just that?
+
+Should we maybe merge expression trees instead, as we evaluate?
+
+Um, that's what we're trying to do, only we're trying to keep independent
+GraphPattern objects produced as evaluation results, and then figure out how
+we can merge those elements.
+
+But, let's say, what if we descended into the expression tree, and evaluated
+each operand, we would be able to track each element's pattern down to when it
+was first created. And whichever expression is referenced, it would always
+ultimately reference the basic elements.
+
+OK, going back, what does it mean to reuse an expression?
+
+Actually, suppose we could have multi-dimensional expressions then reusing an
+expression, and then having another one update it should update both, doesn't
+it? It's just like we had a single expresion with multiple connections, and
+then we updated it. So perhaps we should do the deepest-/left-first evaluation
+priority.
+
+Should we share a GraphPattern when evaluating, instead of creating a new one
+every time? Or at least share the element dictionary?
+
+What would that do for us?
+
+We could just have the value containing left and right boundaries going
+through the expression tree, and referencing the shared element array.
+
+Wait, then we would have conflicting states and they would overwrite each
+other. No. How about we store the origin element atom expression with each
+element and deduplicate that way?
+---
+OK, so do we only have to track the element origins, if the only thing we keep
+is the elements (and their creation status)?
+
+So, should we identify the element by its atom? Let's try.
