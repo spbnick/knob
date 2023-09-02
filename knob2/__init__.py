@@ -865,11 +865,6 @@ class CastOp(BinaryOp):
         left_atom = left_graph.right
         right_atom = right_graph.left
 
-        print("left_graph:", left_graph)
-        print("right_graph:", right_graph)
-        print("left_atom:", left_atom)
-        print("right_atom:", right_atom)
-
         # If we're trying to cast a casting
         if isinstance(left_atom, CastingPattern) or \
                 isinstance(right_atom, CastingPattern):
@@ -891,14 +886,8 @@ class CastOp(BinaryOp):
             role_or_opening = left_atom
             element = right_atom
 
-        print("merged_graph:", left_graph | right_graph)
-
         # If we're completing a role
         if isinstance(role_or_opening, OpeningPattern):
-            print("replacement:",
-                  role_or_opening.element.with_updated_roles(
-                      {role_or_opening.name: element}
-                  ))
             return (left_graph | right_graph).with_replaced_atom(
                 *role_or_opening.element.with_updated_roles(
                     {role_or_opening.name: element}
