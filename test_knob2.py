@@ -279,11 +279,11 @@ def test_refs(e0, e1, r0, r1):
 
 def test_complex(g):
     assert reprs(
-        (a := g.entity.ll_state.Advertising(
+        (a := g.e.ll_state.Advertising(
                 comment='Device is an "advertiser"')) >>
-        g.relation.ll_state_transition >>
-        g.entity.ll_state.Standby(comment='No transmit/receive') >>
-        g.relation.ll_state_transition >> a
+        g.r.ll_state_transition >>
+        g.e.ll_state.Standby(comment='No transmit/receive') >>
+        g.r.ll_state_transition >> a
     ) == (
         "("
             "("  # noqa: E131

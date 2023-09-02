@@ -34,11 +34,21 @@ class Graph:
         return entity
 
     @property
+    def e(self):
+        """An alias for unique entity"""
+        return self.entity
+
+    @property
     def relation(self):
         """A unique relation"""
         relation = RelationAtom(self, self.next_relation_id << 1 | 1)
         self.next_relation_id += 1
         return relation
+
+    @property
+    def r(self):
+        """An alias for unique relation"""
+        return self.relation
 
 
 def abbr(x) -> str:
