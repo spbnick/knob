@@ -784,3 +784,321 @@ OK, so do we only have to track the element origins, if the only thing we keep
 is the elements (and their creation status)?
 
 So, should we identify the element by its atom? Let's try.
+---
+OK, we did that, but what should it mean when a reference to an earlier
+expression has some more operations applied to it? Like setting the type, the
+name, or any other attribute, or changing the roles? What does it mean to
+add or remove the create flag later?
+
+Why do we even have this ambiguity to resolve?
+What would be an ideal situation where we would avoid it?
+How does e.g. Cypher avoid it?
+    - When matching, Cypher lets you name a matched node or a matched
+      relation, not the matching expression itself
+    - When creating nodes or relations referencing matched ones, you
+      explicitly specify what to create. That is separate from matching, and
+      never reused.
+    - Actually the Cypher CREATE clause accepts patterns, and whatever created
+      nodes or relations are named could be returned from the statement.
+    - However, again, Cypher allows naming only nodes or relations as a whole,
+      not expressions.
+    - So for us, referencing an expression should boil down to actually
+      referencing a node. Or rather two nodes at the ends of the expression.
+
+Again, why do we even have this ambiguity to resolve?
+    - Because we want to deduplicate elements, when combining different
+      expressions based on them.
+
+How would you even read an expression like that?
+
+Well, I would say it should still try to do what you write, even if it won't
+match anything. It shouldn't try to cut corners and jump to conclusions. E.g.
+this:
+
+    (x := g.e.x).y >> x.z
+
+Should mean:
+
+    an entity with type "x" and name "y" in a "source" role in a relationship
+    with itself with name "z" as the "target" role.
+
+And would match:
+
+    Nothing, because a particular entity cannot have both name "y" and name
+    "z", but it should try to do that.
+
+But e.g. this:
+
+    (x := g.e.x(a=1)) >> x(b=2)
+
+Should mean:
+    a node with type "x" and attribute a=1 in the "source" role in a
+    relationship with itself with attribute b=2, as the "target" role.
+
+And would match:
+
+    A node with type "x", which has attributes a=1 and b=2 in a relationship
+    with both role "source" and role "target".
+
+That would be possible to match.
+
+And this:
+
+    +(x := g.e.x) >> x
+
+Or, in other words, this:
+
+    x = g.e.x
+    +x >> x
+
+Should mean:
+
+    A node with type "x" must be created as the "source" role in a
+    new relationship, connected as the "target" role to itself.
+
+The effect should be:
+
+    Both the node and the relationship created.
+
+However, this:
+
+    x = g.e.x
+    x << +x
+
+Should fail, if there was no node with type x before.
+
+Now, how would we make this work?
+
+It looks like evaluating all this to some sort of simple pattern would be too
+complicated, because the order of operations has effect on the matching
+outcome. Should we make the expressions do all the work directly instead?
+
+I.e. come up with some sort of a method prototype, that applies the operation
+either as the final one, or the interim one, either forward, or backward?
+
+Hmm... this could work...
+
+Then on each overloaded operation we would call "go back as the final op" on
+each operand, and then call "go forward as the final op" on itself?
+
+And in the method for each operation we would call "go forward as interim" on
+each operand, when going forward, and "go back as interim", when going back?
+
+Eeeh, doesn't seem right, but something like that... hmmm... gotta think a bit
+more.
+
+What would that method return? A subgraph - either created, or matched?
+Because an expression could only restrict the matched set, not expand it?
+Could it expand it? Oh, yes, it could, if we e.g. replace a matched attribute
+value, or a relation.
+
+But it could still be the matched subgraph, along with the complete graph it's
+matching against, and it should have the sets of the elements on the left and
+on the right.
+
+Eeehhh... still gotta think about it.
+---
+The thing is, on every operation we gotta find all the entities and relations
+matching the pattern and create all the entities and relations that were
+requested. And then we have to undo what was created by the operands, and redo
+it again with the current operator.
+---
+OK, could we actually avoid doing any evaluation until a creation flag
+modification happens? I.e. until a `+` or `-` operators are encountered?
+
+That would be nice, but actually we have to do evaluation every time, and
+do (re-)creation with every operation, because other operators modify the
+pattern involved in creation. E.g.:
+
+    +e.x.y >> e.a.b
+
+Would first match e.x.y, then ask to create it, and then request that e.a.b be
+found, and the relation between them be created as well.
+
+Therefore we have to collect the expression tree, maybe collapse it on
+creation flag change boundaries, and execute.
+
+Maybe all the other operations would build a graph pattern, then ... no.
+
+We must only create whatever is marked with the `+` operator, and not marked
+with a `-` operator later. We can only figure that out when the last operator
+is reached (evaluated).
+
+So, collect all the conditions for all the elements, record which elements
+need to be created, then act.
+
+And we're here only because of the ambiguity brought in by references.
+It makes it impossible (seemingly) to simply record both final-state elements
+in the pattern, and have them marked for creation correctly. Because we can
+mark intermediate states.
+
+From the point of view of the operator being evaluated, there could be nodes
+in the expression graph that must be created, but they're always the closest
+ones only.
+
+So, actually if we disregard the creation flag-modification operators, we
+could create a pattern reliably from the expression graph, and sort out
+modification priorities, in theory, to produce a single pattern for every
+operator. However, the creation operators need to act on the expression level,
+splitting and acting on the intermediate states.
+
+So, do we create as we go evaluate, or do we collect, record closest ones,
+then create?
+
+How about we think about it this way:
+* Find patterns that need to be added/removed
+* Nah...
+
+What we get out the whole expression tree with creation flags assigned is an
+expression graph split into parts: something that must be created, and
+something that must be matched, built upon that.
+
+We get to create a bunch of elements described by patterns, ...
+
+Wait, we also need to create the connecting roles/relations, and we can only
+create them, if we can find all the rest of the elements.
+
+---
+OK, let's step back from building the operators and language for describing a
+matching/creating pattern, and let's try to describe a good data structure for
+a graph and a compiled pattern to go together, and then try to bring the
+language to produce that.
+---
+It might be a good idea to describe the terms used in knob and their relations
+using a graph created by knob.
+---
+# Match an element pattern against an element
+match_element(graph, graph_pattern, element_pattern, element):
+    matched_graph = Graph()
+    matched_graph_pattern = GraphPattern()
+    if element_pattern matches element:
+        casting_patterns = all casting patterns in graph_pattern with element_pattern as the relation
+        matched_castings = set()
+        for casting_pattern in casting_patterns:
+            For each casting in the graph with the element as the relation:
+                if matchfunc(matched_graph, matched_graph_pattern, graph, graph_pattern,
+                             casting_pattern.actor, casting.actor):
+                    matched_castings |= casting
+        else:
+            matched_graph |= element
+            matched_castings
+            return True
+    return False
+                    
+
+matched_graph = Graph()
+for each element_pattern in the graph_pattern:
+    matched = False
+    for each element in the graph:
+        matched = matched or match_element(matched_graph, element_pattern, element)
+    if matched:
+        # mark element_pattern processed???
+
+# The problem is that one element pattern could be processed differently,
+# depending on which other element pattern we're arriving from.
+# So we can finish on an already-processed element pattern, but we cannot go
+# further? Yep, but "already-processed" should be path-local (call stack-local).
+# Actually, we should be traversing the graph pattern, and checking that a path
+# exists for each element/casting pattern. 
+# So we can have a function taking and matching one element pattern against a
+# provided set of elements, and taking all the matching/associated castings to
+# call itself with the actor pattern and the elements it matches, which have
+# are in the matching castings in the graph.
+
+match_element_pattern(traversed_element_patterns, element_pattern, elements):
+    if element_pattern in traversed_element_patterns:
+        return True
+    matched_an_element = False
+    for element in elements:
+        if not element_pattern.matches(element):
+            continue
+        matched_an_element = True
+        for each casting_pattern with element_pattern as the relation:
+            actor_elements = actor elements from all matching castings with the element as the relation:
+            if not actor_elements:
+                # Casting pattern doesn't match anything
+                return False
+            if not match_element_pattern(casting_pattern.actor_element_pattern, actor_elements):
+                # The path down the casting pattern doesn't match
+                return False
+    return matched_an_element
+
+
+for each element_pattern in graph_pattern.element_patterns:
+    if not match_element_pattern(element_pattern, graph.elements):
+        # The graph doesn't match the graph pattern
+        return False
+
+
+
+---
+
+
+match_element_pattern(element_pattern, elements):
+    for all casting_pattern's with the element_pattern as the relation:
+
+---
+We match elements according to their attributes
+
+We make sure that each element pattern matches at least one element.
+
+If each element pattern matches at least one element, then all role patterns
+have something to match, isn't it? Because all they do is reference element
+patterns.
+
+Ah, next we need to find if the *graph* actually has those roles between the
+element we found.
+
+Then 
+
+Then we check that role patterns get 
+
+----
+We can't just go over all elements and roles once, because removing one
+element or role, can remove a whole subgraph. We might need to go into
+recursion.
+
+So we have to go into a recursion for each disconnected graph, starting from
+an arbitrary node. We can explore all the pattern nodes, and decide the final
+element set for each.
+
+OK, trying to formulate the problem for ChatGPT:
+
+...
+I have two directed cyclic disconnected multigraphs: "pattern" and "target".
+The nodes in the "pattern" graph are called "pattern nodes", and edges in the
+"pattern" graph are called "pattern edges". Same for the "target" graph:
+"target nodes" and "target edges".
+
+The pattern nodes can match any number of target nodes, according to some
+unspecified conditions, which pertain only to the nodes themselves.
+
+The pattern edges can match any number of target edges, where the pattern
+nodes on their ends match target nodes on the corresponding ends of the target
+edge.
+
+For a pattern graph to match a target graph, each pattern node must match at
+least one target node of its own, and each pattern edge must match at least
+one target edge of its own.
+
+What would be a good algorithm for finding the subgraph of a target graph
+which matches a pattern graph, written in plain text, or a pseudo-language?
+...
+
+---
+OK, let's try again after reading ChatGPT's recommendations:
+
+Build a map between pattern nodes and matching target nodes
+
+match = Graph()
+for each pattern node:
+    for each matching target node (from the map):
+        matching_subgraph |= collect_subgraph(
+            pattern_graph, target_graph, map, pattern_node, target_node
+        )
+
+collect_subgraph(pattern_graph, target_graph, map, pattern_node, target_node):
+    # We know that the target node is already matching
+    match = Graph({target_node})
+    for pattern_target in pattern_graph.targets_of(pattern_node):
+
