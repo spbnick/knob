@@ -2,9 +2,8 @@
 KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 """
 
-from typing import Dict, Set, Union, Optional
+from typing import Dict, Set, Union, Optional, Tuple
 from functools import reduce
-from itertools import product
 
 # Calm down, pylint: disable=too-few-public-methods
 
@@ -155,7 +154,7 @@ class EdgePattern:
     """A graph's edge pattern"""
 
     def __init__(self, source: NodePattern, target: NodePattern,
-                 name: str = None):
+                 name: Optional[str] = None):
         """
         Initialize a graph's edge pattern.
 
@@ -212,44 +211,28 @@ class GraphPattern:
     """A pattern matching/creating a subgraph"""
 
     def __init__(self,
-                 node_patterns: Optional[Set[NodePattern]] = None,
-                 edge_patterns: Optional[Set[EdgePattern]] = None):
+                 *element_patterns: Tuple[Union[NodePattern, EdgePattern]]):
         """
         Initialize a graph pattern.
 
         Args:
-            node_patterns:  A set of patterns for nodes to match/create.
-                            Can be None to mean empty set.
-            edge_patterns:  A set of patterns for edges to match/create.
-                            Must reference node patterns from "node_patterns"
-                            only. Can be None to mean empty set.
+            element_patterns:   A tuple of graph element patterns (node or
+                                edge patterns).
         """
-        if node_patterns is None:
-            node_patterns = set()
-        assert isinstance(node_patterns, set)
-        assert all(isinstance(np, NodePattern) for np in node_patterns)
-
-        if edge_patterns is None:
-            edge_patterns = set()
-        assert isinstance(edge_patterns, set)
-        assert all(isinstance(ep, EdgePattern) for ep in edge_patterns)
-
-        assert node_patterns >= {
-            node_pattern
-            for edge_pattern in edge_patterns
-            for node_pattern in (edge_pattern.source, edge_pattern.target)
-        }
-
-        self.node_patterns = node_patterns.copy()
-        self.edge_patterns = edge_patterns.copy()
-        self.sources_edge_patterns = {
-            node_pattern: {
-                edge_pattern
-                for edge_pattern in self.edge_patterns
-                if node_pattern is edge_pattern.source
-            }
-            for node_pattern in self.node_patterns
-        }
+        assert isinstance(element_patterns, tuple)
+        assert all(
+            isinstance(element_pattern, (NodePattern, EdgePattern))
+            for element_pattern in element_patterns
+        )
+        self.node_patterns: Set[NodePattern] = set()
+        self.edge_patterns: Set[EdgePattern] = set()
+        for element_pattern in element_patterns:
+            if isinstance(element_pattern, NodePattern):
+                self.node_patterns.add(element_pattern)
+            elif isinstance(element_pattern, EdgePattern):
+                self.edge_patterns.add(element_pattern)
+                self.node_patterns.add(element_pattern.source)
+                self.node_patterns.add(element_pattern.target)
 
     def __repr__(self):
         connected_node_patterns = {ep.source for ep in self.edge_patterns} | \
@@ -264,37 +247,24 @@ class GraphPattern:
 class Graph:
     """A graph"""
 
-    def __init__(self,
-                 nodes: Optional[Set[Node]] = None,
-                 edges: Optional[Set[Edge]] = None):
+    def __init__(self, *elements: Tuple[Union[Node, Edge]]):
         """
         Initialize a graph.
 
         Args:
-            nodes:  A set of nodes belonging to the graph.
-                    Can be None to mean empty set.
-            edges:  A set of edges connecting the nodes.
-                    Must reference nodes from "nodes" only.
-                    Can be None to mean empty set.
+            elements:   A tuple of graph elements (nodes or edges).
         """
-        if nodes is None:
-            nodes = set()
-        assert isinstance(nodes, set)
-        assert all(isinstance(n, Node) for n in nodes)
-
-        if edges is None:
-            edges = set()
-        assert isinstance(edges, set)
-        assert all(isinstance(e, Edge) for e in edges)
-
-        assert nodes >= {
-            node
-            for edge in edges
-            for node in (edge.source, edge.target)
-        }
-
-        self.nodes = nodes.copy()
-        self.edges = edges.copy()
+        assert isinstance(elements, tuple)
+        assert all(isinstance(element, (Node, Edge)) for element in elements)
+        self.nodes: Set[Node] = set()
+        self.edges: Set[Edge] = set()
+        for element in elements:
+            if isinstance(element, Node):
+                self.nodes.add(element)
+            elif isinstance(element, Edge):
+                self.edges.add(element)
+                self.nodes.add(element.source)
+                self.nodes.add(element.target)
 
     def __hash__(self):
         return hash((frozenset(self.nodes), frozenset(self.edges)))
@@ -390,10 +360,10 @@ class Graph:
         # mypy has problems with reduce():
         # https://github.com/python/mypy/issues/4673
         return Graph(
-            reduce(lambda x, y: x | y,  # type: ignore
-                   node_patterns_nodes.values(), set()),
-            reduce(lambda x, y: x | y,  # type: ignore
-                   edge_patterns_edges.values(), set())
+            *reduce(lambda x, y: x | y,  # type: ignore
+                    node_patterns_nodes.values(), set()),
+            *reduce(lambda x, y: x | y,  # type: ignore
+                    edge_patterns_edges.values(), set())
         )
 
     def apply(self, pattern: GraphPattern) -> Union["Graph", None]:
