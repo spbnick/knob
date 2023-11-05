@@ -200,3 +200,86 @@ def test_combination_match():
     assert g.match(GP(EP(MNP(c=2), MNP(c=1)))) is None
     assert g.match(GP(EP(MNP(c=2), MNP(c=0)))) is None
     assert g.match(GP(EP(MNP(c=0), MNP(c=2)))) is None
+
+def test_loop_match():
+    n1 = N(x=1)
+    n2 = N(x=2)
+    n3 = N(x=3)
+    mnp1 = MNP()
+    mnp2 = MNP()
+    mnp3 = MNP()
+    g = G(E(n1, n2), E(n2, n3), E(n3, n1))
+    assert g.match(GP(
+        EP(mnp1, mnp2), EP(mnp2, mnp3), EP(mnp3, mnp1)
+    )) == g
+
+def test_disconnected_loops_match():
+    n1 = N(x=1)
+    n2 = N(x=2)
+    n3 = N(x=3)
+    n4 = N(x=4)
+    n5 = N(x=5)
+    n6 = N(x=6)
+    mnp1 = MNP()
+    mnp2 = MNP()
+    mnp3 = MNP()
+    g = G(
+        E(n1, n2), E(n2, n3), E(n3, n1),
+        E(n4, n5), E(n5, n6), E(n6, n4),
+    )
+    assert g.match(GP(
+        EP(mnp1, mnp2), EP(mnp2, mnp3), EP(mnp3, mnp1)
+    )) == g
+
+def test_nested_loops():
+    n1 = N(x=1)
+    n2 = N(x=2)
+    n3 = N(x=3)
+    n4 = N(x=4)
+    mnp1 = MNP()
+    mnp2 = MNP()
+    mnp3 = MNP()
+    mnp4 = MNP()
+    g = G(
+        E(n1, n2), E(n2, n3),
+        E(n3, n4), E(n4, n1),
+        E(n2, n4), E(n4, n2)
+    )
+    assert g.match(GP(
+        EP(mnp1, mnp2), EP(mnp2, mnp3),
+        EP(mnp3, mnp4), EP(mnp4, mnp1),
+        EP(mnp2, mnp4), EP(mnp4, mnp2)
+    )) == g
+    mnp1 = MNP(x=1)
+    mnp2 = MNP(x=2)
+    mnp3 = MNP(x=3)
+    mnp4 = MNP(x=4)
+    assert g.match(GP(
+        EP(mnp1, mnp2), EP(mnp2, mnp3),
+        EP(mnp3, mnp4), EP(mnp4, mnp1),
+        EP(mnp2, mnp4), EP(mnp4, mnp2)
+    )) == g
+    assert g.match(GP(
+        EP(mnp1, mnp2), EP(mnp2, mnp3), EP(mnp3, mnp4),
+    )) == G(
+        E(n1, n2), E(n2, n3), E(n3, n4),
+    )
+    assert g.match(GP(
+        EP(mnp2, mnp4), EP(mnp4, mnp2),
+    )) == G(
+        E(n2, n4), E(n4, n2),
+    )
+    assert g.match(GP(EP(mnp1, mnp3))) is None
+
+def test_disjoint_matching_nodes():
+    n1 = N(x=1)
+    n2_1 = N(x=2)
+    n2_2 = N(x=2)
+    n3 = N(x=3)
+    g = G(E(n1, n2_1), E(n2_2, n3))
+    mnp1 = MNP(x=1)
+    mnp2_1 = MNP(x=2)
+    mnp2_2 = MNP(x=2)
+    mnp3 = MNP(x=3)
+    assert g.match(GP(EP(mnp1, mnp2_1), EP(mnp2_1, mnp3))) is None
+    assert g.match(GP(EP(mnp1, mnp2_1), EP(mnp2_2, mnp3))) == g
