@@ -4,8 +4,10 @@ KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 
 from typing import Dict, Set, Union, Optional, Tuple
 from functools import reduce
+import graphviz  # type: ignore
 
 # Calm down, pylint: disable=too-few-public-methods
+# NO, pylint: disable=use-dict-literal
 
 
 class Node:
@@ -281,6 +283,40 @@ class Graph:
             [repr(e) for e in self.edges] +
             [repr(n) for n in (self.nodes - connected_nodes)]
         ) + "}"
+
+    @classmethod
+    def trim(cls, v: Union[str, int]):
+        """Trim a value to a certain maximum length, if necessary"""
+        return v[:61] + "..." if isinstance(v, str) and len(v) > 64 else v
+
+    @classmethod
+    def quote(cls, v: Union[str, int]):
+        """Quote a value, if necessary"""
+        return str(v) if isinstance(v, int) or v.isidentifier() else repr(v)
+
+    def graphviz(self) -> str:
+        """
+        Render the graph into a Graphviz representation.
+
+        Returns:
+            The rendered Graphviz source code.
+        """
+        graph = graphviz.Digraph()
+        for node in self.nodes:
+            graph.node(
+                str(id(node)),
+                label="\n".join(
+                    f"{self.quote(n)}={self.quote(self.trim(v))}"
+                    for n, v in node.attrs.items()
+                ),
+                _attributes=dict(shape="box")
+            )
+        for edge in self.edges:
+            graph.edge(
+                str(id(edge.source)), str(id(edge.target)),
+                label=edge.name
+            )
+        return graph.source
 
     def match(self, pattern: GraphPattern) -> Optional["Graph"]:
         """
