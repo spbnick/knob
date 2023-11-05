@@ -353,6 +353,8 @@ class Graph:
             edge_pattern.target in node_patterns_nodes
         }
 
+        # While there are no nodes/edges to remove
+        # Sorry, I don't really know what I'm doing here 🤦
         while True:
             prev_node_patterns_nodes = {
                 node_pattern: nodes.copy()
