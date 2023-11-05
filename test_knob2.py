@@ -270,11 +270,63 @@ def test_element_edge_role_edge_element(e0, r0, e1):
     )
 
 
-def test_refs(e0, e1, r0, r1):
-    assert e0
-    assert e1
-    assert r0
-    assert r1
+def test_refs():
+    g = knob2.Graph()
+    assert reprs(
+        (x := g.e.x).y >> x
+    ) == (
+        "e0.x.y - 'source' * r0 * 'target' - e0.x",
+        'e0 < e0.x.y, r0:(source=e0, target=e0) > e0',
+    )
+    x = None
+
+    g = knob2.Graph()
+    assert reprs(
+        (x := g.e.x) >> x.y
+    ) == (
+        "e0.x - 'source' * r0 * 'target' - e0.x.y",
+        'e0 < e0.x, r0:(source=e0, target=e0) > e0',
+    )
+    x = None
+
+    g = knob2.Graph()
+    assert reprs(
+        (x := g.e.x) >> +x
+    ) == (
+        "e0.x - 'source' * r0 * 'target' - +e0.x",
+        'e0 < +e0.x, r0:(source=e0, target=e0) > e0',
+    )
+    x = None
+
+    g = knob2.Graph()
+    assert reprs(
+        (x := +g.e.x) >> -x
+    ) == (
+        "+e0.x - 'source' * r0 * 'target' - -(+e0.x)",
+        'e0 < +e0.x, r0:(source=e0, target=e0) > e0',
+    )
+    x = None
+
+    g = knob2.Graph()
+    assert reprs(
+        (expr := (g.e.x >> g.e.y)) >> expr
+    ) == (
+        "e0.x - 'source' * r0 * 'target' - e1.y - 'source' * r1 * 'target' - "
+        "(e0.x - 'source' * r0 * 'target' - e1.y)",
+        'e0 < '
+        'e0.x, e1.y, r0:(source=e0, target=e1), r1:(source=e1, target=e0) '
+        '> e1',
+    )
+    expr = None
+
+    g = knob2.Graph()
+    assert reprs(
+        (x := g.e.x(attr1=10)) >> g.e.y >> x(attr2=20)
+    ) == (
+        "",
+        ""
+    )
+    x = None
 
 
 def test_complex(g):
