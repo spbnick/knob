@@ -13,7 +13,7 @@ import graphviz  # type: ignore
 class Node:
     """A graph node"""
 
-    def __init__(self, **attrs: Dict[str, Union[str, int]]):
+    def __init__(self, **attrs: Union[str, int]):
         """
         Initialize a node.
 
