@@ -318,15 +318,24 @@ class Graph:
             )
         return graph.source
 
-    def match(self, pattern: GraphPattern) -> Optional["Graph"]:
+    def detailed_match(self, pattern: GraphPattern) -> Tuple[
+        Optional["Graph"],
+        Dict[NodePattern, Set[Node]],
+        Dict[EdgePattern, Set[Edge]]
+    ]:
         """
-        Return the subgraph matching the matching part of a graph pattern.
+        Return the subgraph matching the matching part of a graph pattern,
+        along with maps of node/edge patterns to their matching nodes/edges.
 
         Args:
             pattern:    The graph pattern to apply.
 
         Returns:
-            A graph containing the matched nodes and edges.
+            Three values:
+            * a graph containing the matched nodes and edges,
+              or None, if not matched;
+            * a dictionary of node patterns and sets of nodes they match;
+            * a dictionary of edge patterns and sets of edges they match.
         """
         # A dictionary of matching (not "create") node patterns and
         # sets of nodes they match
@@ -390,19 +399,34 @@ class Graph:
                     node_patterns_nodes == prev_node_patterns_nodes:
                 break
 
-        # If any patterns matched nothing
-        if not all(node_patterns_nodes.values()) or \
-           not all(edge_patterns_edges.values()):
-            return None
+        # If all patterns matched something
+        if all(node_patterns_nodes.values()) and \
+           all(edge_patterns_edges.values()):
+            # mypy has problems with reduce():
+            # https://github.com/python/mypy/issues/4673
+            graph = Graph(
+                *reduce(lambda x, y: x | y,  # type: ignore
+                        node_patterns_nodes.values(), set()),
+                *reduce(lambda x, y: x | y,  # type: ignore
+                        edge_patterns_edges.values(), set())
+            )
+        else:
+            graph = None
 
-        # mypy has problems with reduce():
-        # https://github.com/python/mypy/issues/4673
-        return Graph(
-            *reduce(lambda x, y: x | y,  # type: ignore
-                    node_patterns_nodes.values(), set()),
-            *reduce(lambda x, y: x | y,  # type: ignore
-                    edge_patterns_edges.values(), set())
-        )
+        return graph, node_patterns_nodes, edge_patterns_edges
+
+    def match(self, pattern: GraphPattern) -> Optional["Graph"]:
+        """
+        Return the subgraph matching the matching part of a graph pattern.
+
+        Args:
+            pattern:    The graph pattern to apply.
+
+        Returns:
+            A graph containing the matched nodes and edges, or None, if not
+            matched.
+        """
+        return self.detailed_match(pattern)[0]
 
     def apply(self, pattern: GraphPattern) -> Union["Graph", None]:
         """
