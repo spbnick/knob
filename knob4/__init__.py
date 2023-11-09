@@ -210,6 +210,11 @@ class EdgePattern:
             self.source.matches(edge.source) and \
             self.target.matches(edge.target)
 
+    @property
+    def create(self):
+        """True if the edge should be created"""
+        return self.source.create or self.target.create
+
 
 class GraphPattern:
     """A pattern matching/creating a subgraph"""
@@ -360,8 +365,7 @@ class Graph:
                 (edge_pattern.name is None or edge_pattern.name == edge.name)
             }
             for edge_pattern in pattern.edge_patterns
-            if edge_pattern.source in node_patterns_nodes and
-            edge_pattern.target in node_patterns_nodes
+            if not edge_pattern.create
         }
 
         # While there are no nodes/edges to remove
