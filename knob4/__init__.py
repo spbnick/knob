@@ -436,14 +436,54 @@ class Graph:
 
     def apply(self, pattern: GraphPattern) -> Union["Graph", None]:
         """
-        Apply a graph pattern to the graph, creating the nodes and the
-        edges requested by the pattern, if any.
+        Apply a graph pattern to the graph, returning a graph with nodes and
+        edges created by the pattern.
 
         Args:
             pattern:    The graph pattern to apply.
 
         Returns:
-            A graph containing nodes and edges added to the graph (can be
-            empty), if the pattern applied, or None, if it didn't.
+            A graph containing nodes and edges to be added to the graph (can
+            be empty), if the pattern matched, or None, if it didn't.
         """
-        return None
+        # A map of create flag, node patterns, and corresponding nodes
+        create_node_patterns_nodes: \
+            Dict[bool, Dict[NodePattern, Set[Node]]] = {False: {}, True: {}}
+        # A map of create flag, edge patterns, and corresponding edges
+        create_edge_patterns_edges: \
+            Dict[bool, Dict[EdgePattern, Set[Edge]]] = {False: {}, True: {}}
+
+        matched_graph, \
+            create_node_patterns_nodes[False], \
+            create_edge_patterns_edges[False] = \
+            self.detailed_match(pattern)
+        if matched_graph is None:
+            return None
+
+        # A map of create node patterns and a set of their created nodes
+        create_node_patterns_nodes[True] = {
+            node_pattern: {Node(**node_pattern.attrs)}
+            for node_pattern in pattern.node_patterns
+            if node_pattern.create
+        }
+        # A map of create edge patterns and a set of their created edges
+        create_edge_patterns_edges[True] = {
+            edge_pattern: {
+                Edge(source, target, edge_pattern.name)
+                for source in create_node_patterns_nodes
+                [edge_pattern.source.create][edge_pattern.source]
+                for target in create_node_patterns_nodes
+                [edge_pattern.target.create][edge_pattern.target]
+            }
+            for edge_pattern in pattern.edge_patterns
+            if edge_pattern.create and edge_pattern.name is not None
+        }
+
+        return Graph(
+            # mypy has problems with reduce():
+            # https://github.com/python/mypy/issues/4673
+            *reduce(lambda x, y: x | y,  # type: ignore
+                    create_node_patterns_nodes[True].values(), set()),
+            *reduce(lambda x, y: x | y,  # type: ignore
+                    create_edge_patterns_edges[True].values(), set())
+        )
