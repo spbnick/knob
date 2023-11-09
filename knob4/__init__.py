@@ -77,7 +77,7 @@ class Edge:
 class NodePattern:
     """A graph node pattern"""
 
-    def __init__(self, create: bool, **attrs: Dict[str, Union[str, int]]):
+    def __init__(self, create: bool, **attrs: Union[str, int]):
         """
         Initialize a graph node pattern.
 
@@ -117,7 +117,7 @@ class NodePattern:
 class MatchingNodePattern(NodePattern):
     """A matching graph node pattern"""
 
-    def __init__(self, **attrs: Dict[str, Union[str, int]]):
+    def __init__(self, **attrs: Union[str, int]):
         """
         Initialize a matching graph node pattern.
 
@@ -136,7 +136,7 @@ class MatchingNodePattern(NodePattern):
 class CreatingNodePattern(NodePattern):
     """A creating graph node pattern"""
 
-    def __init__(self, **attrs: Dict[str, Union[str, int]]):
+    def __init__(self, **attrs: Union[str, int]):
         """
         Initialize a creating graph node pattern.
 
