@@ -168,6 +168,8 @@ class EdgePattern:
         assert isinstance(source, NodePattern)
         assert isinstance(target, NodePattern)
         assert name is None or isinstance(name, str)
+        assert name is not None or not (source.create or target.create), \
+            "Cannot create an edge without a name"
         self.source = source
         self.target = target
         self.name = name
