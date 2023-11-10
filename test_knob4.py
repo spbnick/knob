@@ -10,19 +10,19 @@ from knob4 import GraphPattern as GP
 # Boooring, pylint: disable=missing-function-docstring
 
 
-def test_empty_both():
+def test_match_empty_both():
     assert G().match(GP()) == G()
 
 
-def test_empty_graph_pattern():
+def test_match_empty_graph_pattern():
     assert G(E(N(x=1), N(x=2))).match(GP()) == G()
 
 
-def test_empty_graph():
+def test_match_empty_graph():
     assert G().match(GP(EP(MNP(x=1), MNP(x=2)))) is None
 
 
-def test_one_node_match():
+def test_match_one_node():
     g = G(N())
     assert g.match(GP(MNP())) == g
     g = G(N(x=1))
@@ -33,37 +33,37 @@ def test_one_node_match():
     assert g.match(GP(MNP(x=1))) == g
 
 
-def test_one_node_mismatch():
+def test_mismatch_one_node():
     gp = GP(MNP(x=2))
     assert G(N(x=1)).match(gp) is None
     assert G(N(y=2)).match(gp) is None
 
 
-def test_one_out_of_two_node_patterns_match():
+def test_match_one_out_of_two_node_patterns():
     g = G(N(x=2), N(x=3))
     gp = GP(MNP(x=1), MNP(x=2))
     assert g.match(gp) is None
 
 
-def test_two_node_match():
+def test_match_two_node():
     g = G(N(x=1), N(x=2))
     gp = GP(MNP(x=1), MNP(x=2))
     assert g.match(gp) == g
 
 
-def test_one_edge_match():
+def test_match_one_edge():
     g = G(E(N(x=1), N(x=2)))
     gp = GP(EP(MNP(x=1), MNP(x=2)))
     assert g.match(gp) == g
 
 
-def test_one_edge_mismatch():
+def test_mismatch_one_edge():
     g = G(E(N(x=1), N(x=2), "a"))
     gp = GP(EP(MNP(x=1), MNP(x=2), "b"))
     assert g.match(gp) is None
 
 
-def test_one_out_of_two_edge_patterns_match():
+def test_match_one_out_of_two_edge_patterns():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -80,7 +80,7 @@ def test_one_out_of_two_edge_patterns_match():
     assert g.match(gp) is None
 
 
-def test_self_loop_match():
+def test_match_self_loop():
     n = N()
     g = G(E(n, n))
     mnp = MNP()
@@ -88,13 +88,13 @@ def test_self_loop_match():
     assert g.match(gp) == g
 
 
-def test_disconnected_node_match():
+def test_match_disconnected_node():
     g = G(E(N(x=1), N(x=2)), N(x=3))
     gp = GP(EP(MNP(x=1), MNP(x=2)), MNP(x=3))
     assert g.match(gp) == g
 
 
-def test_three_nodes_two_edges_match():
+def test_match_three_nodes_two_edges():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -108,7 +108,7 @@ def test_three_nodes_two_edges_match():
     assert g.match(gp) == g
 
 
-def test_missing_edge_mismatch():
+def test_mismatch_missing_edge():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -121,7 +121,7 @@ def test_missing_edge_mismatch():
     assert g.match(gp) is None
 
 
-def test_extra_edge_match():
+def test_match_extra_edge():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -134,7 +134,7 @@ def test_extra_edge_match():
     assert g.match(gp) == G(E(n1, n2), E(n2, n3))
 
 
-def test_some_nodes_match():
+def test_match_some_nodes():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -145,7 +145,7 @@ def test_some_nodes_match():
     assert G(n1, n2, n3).match(GP(mnp1, mnp2)) == G(n1, n2)
 
 
-def test_some_edges_match():
+def test_match_some_edges():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -162,7 +162,7 @@ def test_some_edges_match():
     ) == G(E(n1, n2), E(n2, n3))
 
 
-def test_combination_match():
+def test_match_combination():
     n = [[N(r=r, c=c) for c in range(0, 3)] for r in range(0, 2)]
     g = G(*(
         E(n[sr][sc], n[tr][sc + 1])
@@ -218,7 +218,7 @@ def test_combination_match():
     assert g.match(GP(EP(MNP(c=0), MNP(c=2)))) is None
 
 
-def test_loop_match():
+def test_match_loop():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -231,7 +231,7 @@ def test_loop_match():
     )) == g
 
 
-def test_disconnected_loops_match():
+def test_match_disconnected_loops():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -250,7 +250,7 @@ def test_disconnected_loops_match():
     )) == g
 
 
-def test_nested_loops():
+def test_match_nested_loops():
     n1 = N(x=1)
     n2 = N(x=2)
     n3 = N(x=3)
@@ -291,7 +291,7 @@ def test_nested_loops():
     assert g.match(GP(EP(mnp1, mnp3))) is None
 
 
-def test_disjoint_matching_nodes():
+def test_match_disjointing_nodes():
     n1 = N(x=1)
     n2_1 = N(x=2)
     n2_2 = N(x=2)
