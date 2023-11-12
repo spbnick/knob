@@ -1,8 +1,10 @@
 """Knob4 tests."""
+import itertools
 from knob4 import Node as N
 from knob4 import Edge as E
 from knob4 import Graph as G
 from knob4 import MatchingNodePattern as MNP
+from knob4 import CreatingNodePattern as CNP
 from knob4 import EdgePattern as EP
 from knob4 import GraphPattern as GP
 
@@ -303,3 +305,142 @@ def test_match_disjointing_nodes():
     mnp3 = MNP(x=3)
     assert g.match(GP(EP(mnp1, mnp2_1), EP(mnp2_1, mnp3))) is None
     assert g.match(GP(EP(mnp1, mnp2_1), EP(mnp2_2, mnp3))) == g
+
+
+def test_apply_empty_both():
+    assert G().apply(GP()) == G()
+
+
+def test_apply_empty_graph_pattern():
+    assert G(E(N(x=1), N(x=2))).apply(GP()) == G()
+
+
+def test_apply_empty_graph_and_matching_pattern():
+    assert G().apply(GP(EP(MNP(x=1), MNP(x=2)))) is None
+
+
+def test_apply_first_new_node():
+    g = G().apply(GP(CNP()))
+    assert g.match(GP(MNP())) == g
+
+
+def test_apply_first_new_edge():
+    mnp = MNP()
+    g = G(N())
+    assert g.apply(GP(EP(mnp, mnp, ""))) is None
+    assert g.apply(GP(EP(mnp, mnp, "", create=False))) is None
+    cg = g.apply(GP(EP(mnp, mnp, "", create=True)))
+    assert cg.match(GP(mnp)) != cg
+    assert cg.match(GP(EP(mnp, mnp))) == cg
+    assert cg.match(GP(EP(mnp, mnp, ""))) == cg
+
+
+def test_apply_topographic():
+    sides = tuple(range(0, 2))
+    nodes = tuple(range(0, 3))
+    n = [
+        [
+            N(side=side, node=node)
+            for node in nodes
+        ]
+        for side in sides
+    ]
+    g = G(
+        E(n[0][0], n[0][1]), E(n[0][1], n[0][2]), E(n[0][2], n[0][0]),
+        E(n[1][0], n[1][1]), E(n[1][1], n[1][2]), E(n[1][2], n[1][0]),
+        E(n[0][0], n[1][0])
+    )
+    mnp = [[MNP() for node in nodes] for side in sides]
+    gp = GP(
+        EP(mnp[0][0], mnp[0][1]),
+        EP(mnp[0][1], mnp[0][2]),
+        EP(mnp[0][2], mnp[0][0]),
+
+        EP(mnp[1][0], mnp[1][1]),
+        EP(mnp[1][1], mnp[1][2]),
+        EP(mnp[1][2], mnp[1][0]),
+
+        EP(mnp[0][0], mnp[1][0]),
+
+        EP(mnp[0][1], mnp[1][1], "new", True),
+        EP(mnp[0][2], mnp[1][2], "new", True),
+    )
+    new_g = G(
+        E(n[0][1], n[1][1], "new"),
+        E(n[0][2], n[1][2], "new"),
+    )
+    print(new_g.graphviz())
+    assert g.apply(gp) == new_g
+
+
+def disabled_test_apply_connect_two_subgraphs():
+    sides = tuple(range(0, 2))
+    cycles = tuple(range(0, 2))
+    nodes = tuple(range(0, 3))
+    # Create the nodes
+    n = [
+        [
+            [
+                N(side=side, cycle=cycle, node=node)
+                for node in nodes
+            ]
+            for cycle in cycles
+        ]
+        for side in sides
+    ]
+    g = G(*itertools.chain(
+        # Make the cycles
+        (
+            E(n[side][cycle][node],
+              n[side][cycle][(node + 1) % len(nodes)])
+            for side in sides
+            for cycle in cycles
+            for node in nodes
+        ),
+        # Connect a pair of nodes between cycles on different sides
+        (
+            E(n[0][cycle][0], n[1][cycle][0])
+            for cycle in cycles
+        ),
+        # List all the nodes just in case
+        itertools.chain.from_iterable(itertools.chain.from_iterable(n))
+    ))
+
+    mnp = [
+        [
+            [
+                MNP()
+                for node in nodes
+            ]
+            for cycle in cycles
+        ]
+        for side in sides
+    ]
+
+    gp = GP(*itertools.chain(
+        # Make the cycle patterns
+        (
+            EP(mnp[side][cycle][node],
+               mnp[side][cycle][(node + 1) % len(nodes)])
+            for side in sides
+            for cycle in cycles
+            for node in nodes
+        ),
+        # Mention the nodes connected between cycles
+        (
+            EP(mnp[0][cycle][0], mnp[1][cycle][0])
+            for cycle in cycles
+        ),
+        # Connect another pair of nodes between cycles
+        (
+            EP(mnp[0][cycle][1], mnp[1][cycle][1], "", True)
+            for cycle in cycles
+        ),
+        # List all the node patterns just in case
+        itertools.chain.from_iterable(itertools.chain.from_iterable(mnp))
+    ))
+    #print(g.graphviz())
+    #print(g.match(gp).graphviz())
+    print(g.apply(gp).graphviz())
+
+    assert False

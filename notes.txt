@@ -1102,3 +1102,7 @@ collect_subgraph(pattern_graph, target_graph, map, pattern_node, target_node):
     match = Graph({target_node})
     for pattern_target in pattern_graph.targets_of(pattern_node):
 
+---
+Ah, everything is going well so far, but I wonder how can we create a pattern
+matching e.g. two nodes *without* an edge between them? I.e. how can we make
+negative patterns? Gotta think about that.
