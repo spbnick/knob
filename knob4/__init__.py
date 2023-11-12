@@ -156,7 +156,7 @@ class EdgePattern:
     """A graph's edge pattern"""
 
     def __init__(self, source: NodePattern, target: NodePattern,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None, create: bool = False):
         """
         Initialize a graph's edge pattern.
 
@@ -164,15 +164,19 @@ class EdgePattern:
             source: The edge's source node pattern.
             target: The edge's target node pattern.
             name:   The name of the edge, or None to match any name.
+            create: If False, and both source and target have "create" False,
+                    the edge should be matched. Otherwise, created.
         """
         assert isinstance(source, NodePattern)
         assert isinstance(target, NodePattern)
         assert name is None or isinstance(name, str)
         assert name is not None or not (source.create or target.create), \
             "Cannot create an edge without a name"
+        assert isinstance(create, bool)
         self.source = source
         self.target = target
         self.name = name
+        self.create = create or source.create or target.create
 
     def __repr__(self):
         if self.name is None:
@@ -209,11 +213,6 @@ class EdgePattern:
         return (self.name is None or self.name == edge.name) and \
             self.source.matches(edge.source) and \
             self.target.matches(edge.target)
-
-    @property
-    def create(self):
-        """True if the edge should be created"""
-        return self.source.create or self.target.create
 
 
 class GraphPattern:
