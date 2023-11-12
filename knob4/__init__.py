@@ -28,7 +28,7 @@ class Node:
         self.attrs = attrs.copy()
 
     def __repr__(self):
-        return "(" + ", ".join(
+        return str(id(self)) + "(" + ", ".join(
             (k if k.isidentifier() else repr(k)) + "=" + repr(v)
             for k, v in self.attrs.items()
         ) + ")"
@@ -96,7 +96,7 @@ class NodePattern:
         self.create = create
 
     def __repr__(self):
-        return ("", "+")[self.create] + "(" + ", ".join(
+        return ("", "+")[self.create] + str(id(self)) + "(" + ", ".join(
             (k if k.isidentifier() else repr(k)) + "=" + repr(v)
             for k, v in self.attrs.items()
         ) + ")"
