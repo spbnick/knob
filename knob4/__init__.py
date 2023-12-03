@@ -219,21 +219,35 @@ class GraphPattern:
     """A pattern matching/creating a subgraph"""
 
     def __init__(self,
-                 *element_patterns: Tuple[Union[NodePattern, EdgePattern]]):
+                 *element_patterns: Tuple[Union[NodePattern, EdgePattern]],
+                 node_patterns: Optional[Set[NodePattern]] = None,
+                 edge_patterns: Optional[Set[EdgePattern]] = None):
         """
         Initialize a graph pattern.
 
         Args:
             element_patterns:   A tuple of graph element patterns (node or
                                 edge patterns).
+            node_patterns:      A set of node patterns to add to the element
+                                patterns, or None for empty set.
+            edge_patterns:      A set of edge patterns to add to the element
+                                patterns, or None for empty set.
         """
         assert isinstance(element_patterns, tuple)
         assert all(
             isinstance(element_pattern, (NodePattern, EdgePattern))
             for element_pattern in element_patterns
         )
-        self.node_patterns: Set[NodePattern] = set()
-        self.edge_patterns: Set[EdgePattern] = set()
+        assert node_patterns is None or isinstance(node_patterns, set) and all(
+            isinstance(node_pattern, NodePattern)
+            for node_pattern in node_patterns
+        )
+        assert edge_patterns is None or isinstance(edge_patterns, set) and all(
+            isinstance(edge_pattern, EdgePattern)
+            for edge_pattern in edge_patterns
+        )
+        self.node_patterns: Set[NodePattern] = (node_patterns or set()).copy()
+        self.edge_patterns: Set[EdgePattern] = (edge_patterns or set()).copy()
         for element_pattern in element_patterns:
             if isinstance(element_pattern, NodePattern):
                 self.node_patterns.add(element_pattern)
@@ -255,17 +269,29 @@ class GraphPattern:
 class Graph:
     """A graph"""
 
-    def __init__(self, *elements: Tuple[Union[Node, Edge]]):
+    def __init__(self, *elements: Tuple[Union[Node, Edge]],
+                 nodes: Optional[Set[Node]] = None,
+                 edges: Optional[Set[Edge]] = None):
         """
         Initialize a graph.
 
         Args:
             elements:   A tuple of graph elements (nodes or edges).
+            nodes:      A set of nodes to add to the elements,
+                        or None for empty set.
+            edges:      A set of edges to add to the elements,
+                        or None for empty set.
         """
         assert isinstance(elements, tuple)
         assert all(isinstance(element, (Node, Edge)) for element in elements)
-        self.nodes: Set[Node] = set()
-        self.edges: Set[Edge] = set()
+        assert nodes is None or isinstance(nodes, set) and all(
+            isinstance(node, Node) for node in nodes
+        )
+        assert edges is None or isinstance(edges, set) and all(
+            isinstance(edge, Edge) for edge in edges
+        )
+        self.nodes: Set[Node] = (nodes or set()).copy()
+        self.edges: Set[Edge] = (edges or set()).copy()
         for element in elements:
             if isinstance(element, Node):
                 self.nodes.add(element)
@@ -410,10 +436,10 @@ class Graph:
             # mypy has problems with reduce():
             # https://github.com/python/mypy/issues/4673
             graph = Graph(
-                *reduce(lambda x, y: x | y,  # type: ignore
-                        node_patterns_nodes.values(), set()),
-                *reduce(lambda x, y: x | y,  # type: ignore
-                        edge_patterns_edges.values(), set())
+                nodes=reduce(lambda x, y: x | y,  # type: ignore
+                             node_patterns_nodes.values(), set()),
+                edges=reduce(lambda x, y: x | y,  # type: ignore
+                             edge_patterns_edges.values(), set())
             )
         else:
             graph = None
@@ -481,8 +507,8 @@ class Graph:
         return Graph(
             # mypy has problems with reduce():
             # https://github.com/python/mypy/issues/4673
-            *reduce(lambda x, y: x | y,  # type: ignore
-                    create_node_patterns_nodes[True].values(), set()),
-            *reduce(lambda x, y: x | y,  # type: ignore
-                    create_edge_patterns_edges[True].values(), set())
+            nodes=reduce(lambda x, y: x | y,  # type: ignore
+                         create_node_patterns_nodes[True].values(), set()),
+            edges=reduce(lambda x, y: x | y,  # type: ignore
+                         create_edge_patterns_edges[True].values(), set())
         )
