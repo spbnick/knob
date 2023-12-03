@@ -265,6 +265,10 @@ class GraphPattern:
              for np in (self.node_patterns - connected_node_patterns)]
         ) + "}"
 
+    def __copy__(self):
+        return GraphPattern(node_patterns=self.node_patterns,
+                            edge_patterns=self.edge_patterns)
+
 
 class Graph:
     """A graph"""
@@ -315,6 +319,9 @@ class Graph:
             [repr(e) for e in self.edges] +
             [repr(n) for n in (self.nodes - connected_nodes)]
         ) + "}"
+
+    def __copy__(self):
+        return Graph(nodes=self.nodes, edges=self.edges)
 
     @classmethod
     def trim(cls, v: Union[str, int]):
