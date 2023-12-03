@@ -323,6 +323,12 @@ class Graph:
     def __copy__(self):
         return Graph(nodes=self.nodes, edges=self.edges)
 
+    def __or__(self, other):
+        if not isinstance(other, Graph):
+            return NotImplemented
+        return Graph(nodes=(self.nodes | other.nodes),
+                     edges=(self.edges | other.edges))
+
     @classmethod
     def trim(cls, v: Union[str, int]):
         """Trim a value to a certain maximum length, if necessary"""
