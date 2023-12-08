@@ -1106,3 +1106,89 @@ collect_subgraph(pattern_graph, target_graph, map, pattern_node, target_node):
 Ah, everything is going well so far, but I wonder how can we create a pattern
 matching e.g. two nodes *without* an edge between them? I.e. how can we make
 negative patterns? Gotta think about that.
+---
+A node pattern matches if all outgoing edge patterns match
+An edge pattern matches, if it matches at least one edge
+
+We gotta define individual and recursive "matches" separately.
+
+Or can we really?
+
+OK, recursively, while we're walking the potentially-matching subgraph:
+    * A node pattern matches a node, when all its attribute patterns match at
+      least one attribute of the node, and when all its outgoing edge patterns
+      match at least one outgoing edge of the node.
+    * An edge pattern matches an edge, when all its attribute patterns match
+      at least one attribute of the edge (only "name" currently), and the
+      edge's target node pattern matches the edge's target node.
+
+So we need to track two "matched graphs": one that contains complete matched
+subgraphs, and one for each traveled branch.
+
+The match_subgraph function matches a subpattern to a subgraph, each defined
+as a specific node and all outgoing edges, and subgraphs they are directed at.
+
+A pattern matches if all its subpatterns match.
+
+However, we can e.g. have one node pattern, and have all its connected
+subpatterns match in one combination, but fail to match that combination when
+the node pattern is considered. Because e.g. there are no matching edges
+connecting those subpatterns to the node matching the node pattern.
+
+In theory, if we simply try matching every node pattern starting from every
+node....
+
+Wait, what if we try to match a subpattern from the wrong subgraph, and then
+try to connect that ...
+
+Ah, wait we should be iterating over node patterns until we find one that
+matches the complete graph pattern to something (by trying to start matching
+from every node). OK, that works for connected graphs/patterns.
+
+What if we have disconnected graph pattern?
+
+ASIDE:
+    Or should we actually call them pattern graphs? Similar to pattern... Ah
+    wait, those are node patterns, and edge patterns, so it should be graph
+    patterns. But graph patterns are also graphs, and we need to talk about
+    them. Should we switch the order? Pattern node, pattern edge, pattern
+    graph? Hmm... We need to consider that... And then we would naturally have
+    pattern subgraph...
+
+Waaaait, it's possible to have a directed graph which has no root vertex. That
+is it has no node which can reach all other nodes following edge direction.
+E.g.:
+
+    A->B<-C
+
+We can follow the edge direction from A to B, not not to C, we can follow the
+edge direction from C to B, but not to A. And we cannot go anywhere from B.
+
+Therefore we cannot align the order of our matching with the edge direction.
+We should ignore edge directions when traversing for matching, and only use
+the edge direction for matching.
+
+OK, change of plans.
+
+We need to first find all components of the disconnected graph, and match them
+separately.
+
+Thus:
+A pattern graph matches if all its components match.
+A pattern component matches when, starting with any of its nodes:
+* A pattern node matches a node, when each of its pattern attributes match at
+  least one attribute of the node, and when all its edge patterns (regardless
+  of direction) match at least one edge of the node.
+* An edge pattern matches an edge, when their directions match, when all its
+  pattern attributes match at least one attribute of the edge (only "name"
+  currently), and the edge's other node pattern matches the edge's
+  corresponding node.
+
+Now we need to figure out if each pattern, at every level, must match a
+corresponding dedicated object. Or should we leave it to the pattern author to
+provide enough identifying information to ensure that the match is dedicated,
+when they need it.
+
+Hmm, the latter wouldn't be possible, if we have absolutely identical objects,
+and the pattern author wants to match, e.g. nodes that are connected by at
+least three identical edges.
