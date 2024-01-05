@@ -1177,11 +1177,11 @@ Thus:
 A pattern graph matches if all its components match.
 A pattern component matches when, starting with any of its nodes:
 * A pattern node matches a node, when each of its pattern attributes match at
-  least one attribute of the node, and when all its edge patterns (regardless
-  of direction) match at least one edge of the node.
-* An edge pattern matches an edge, when their directions match, when all its
-  pattern attributes match at least one attribute of the edge (only "name"
-  currently), and the edge's other node pattern matches the edge's
+  least one attribute of the node, and when each of its pattern edges
+  (regardless of direction) match at least one edge of the node.
+* An edge pattern matches an edge, when their directions match, when each of
+  its pattern attributes match at least one attribute of the edge (only "name"
+  currently), and the pattern edge's other node pattern matches the edge's
   corresponding node.
 
 Now we need to figure out if each pattern, at every level, must match a
@@ -1192,3 +1192,429 @@ when they need it.
 Hmm, the latter wouldn't be possible, if we have absolutely identical objects,
 and the pattern author wants to match, e.g. nodes that are connected by at
 least three identical edges.
+
+---
+It seems that the user would want to have each separate pattern node/edge
+match a dedicated node/edge. However, two separate pattern elements can share
+the two elements they match, and they both should match both. This is fine as
+long as each separate pattern element *can* get a dedicated match. If only
+because the pattern graph doesn't define any preference or match assignment
+order in this case.
+
+But how to make sure this condition is satisfied?
+
+Can we use a shared graph containing all allocated elements for all routes?
+And prohibit reuse? That seems to solve the dedicated match problem.
+What about finding *all* matches?
+
+We also need to make sure that each pattern graph component gets its own
+match. Does it have to be a component as well? Or can multiple pattern graph
+components match a single component? Yeees? We don't support negative matches
+(no edge, no node, no attribute, etc.), at least not yet.
+
+So we have a global set of nodes/edges we visited, with a separate copy for
+each branch we explore, and only keep ones from succesful branches.
+
+But to be able to find all possible matching subgraphs we gotta continue
+matching past the first succesful match for every branch. And each successful
+match could affect the possibility of another branch finding its own match.
+
+Ah, wait, what works for a branch, works for the whole match as well.
+
+So, how do we make sure all possible complete matches are explored? How do we
+make sure we do one complete match at a time? How do we iterate the choices?
+
+What is a choice?
+
+If none of the pattern nodes have more than one edge, and the pattern graph is
+connected, then there's no choice of how to apply the pattern. Actually,
+there's a choice on which node to start the pattern match with, and it can
+affect which graph component gets matched.
+
+Oh, wait, our algorithm is get a pattern node and try starting the match from
+every node in turn. This will get us all possible matches, because we traverse
+regardless of the edge direction now.
+
+So could it be:
+    Let matched pattern graph be empty
+    Let matched graph be empty
+    While matched pattern graph < pattern graph
+        Take an unmatched pattern node
+            Take an unmatched node
+                If all reachable pattern nodes match through traversal
+                    Add matched (pattern) nodes and edges to the matched (pattern) graph
+
+---
+OK, I forgot almost everything I was thinking about before.
+
+Question:
+How do we make sure we get all possible matches of the pattern graph to the
+graph into a single output graph, where every node/edge match at least once?
+
+We need to somehow iterate over all possible ways to match the pattern graph
+to the graph, discard the ones that match, and add the ones that match to the
+output graph. And it would be great if we could somehow discard some ways
+early.
+
+What does ultimately describe a way to match a pattern graph against a graph?
+
+OK, let's try:
+
+* Which pattern node and which node we start matching from
+* For each pattern node/node match:
+    * For each choice of connected pattern edge matching an edge:
+        * Which edge do we take
+
+So, if we just act stupid:
+
+For each pattern node
+    For each node candidate
+        Create empty matched pattern graph
+        Create empty matched graph
+        Function
+            For each connected pattern edge
+                For each connected edge candidate
+                    Fork matched pattern graph and graph (somehow?)
+                    Traverse/recurse
+        If matched pattern graph is complete
+            Add matched graph to the output graph
+
+So the matched (pattern) graph only contains (pattern) nodes/edges for the
+current route through the graph.
+
+Oh, wait, we won't necessarily be able to traverse the complete pattern graph
+from a single pattern node.
+
+So our loop is wrong.
+
+So, what constitutes a full attempt to match a complete pattern graph?
+What would the loop for that be?
+
+So perhaps if we traversed all the reachable pattern nodes starting from the
+one we picked, we can see if any pattern nodes are remaining, and proceed with
+matching *them* against *remaining*, unmatched nodes, until all match, or
+there's no way to proceed?
+
+OK, now that would be one complete match. How do we proceed to another
+complete match? We make all the same choices except we try another option in
+the last choice. Then repeat until all the choices are exhausted.
+
+So, our choices for a single pattern graph match are:
+* Which unmatched pattern node we take
+* Which unmatched candidate node we take
+* Which candidate edge we take in each case, as we traverse
+* Repeat until pattern graph is all matched
+
+The choices can be encoded as a pair of pattern subgraph and corresponding
+subgraph containing the chosen (pattern) nodes/edges, essentially a pair of
+paths, one for the pattern graph, and one for the graph.
+
+So, in theory, we can keep a set of these explored-path subgraphs, and before
+making a choice, check if the resulting path would be a subgraph of an
+already-explored one? And if it did, not go there?
+
+ASIDE: Later we can perhaps come up with some sort of bitmap matching to speed
+       things up and use less memory?
+
+Can we get away with only keeping the subgraphs, i.e. paths through the graph?
+And not keep the pattern subgraphs (paths through the pattern graph)?
+
+Let's suppose we had two different paths through the pattern graph matching
+the same path through the graph, which is totally possible.
+
+We can imagine that one part of the pattern graph would only match a
+particular subgraph partially, and another fully. So the exploration of that
+subgraph should not be stopped for the latter part of the pattern graph.
+
+Therefore we need to keep *both* the explored pattern subgraph and the
+subgraph it matched.
+
+And we only keep the pairs for completed explorations (regardless succesfull
+or not).
+
+So, again: we need to collect all possible subgraphs which match the pattern
+graph. We need to explore *all* possible ways of matching a pattern graph to
+the graph, and record all fully-matched subgraphs. To make sure we explore
+*all* the ways, we need to keep track of the ones we already did. We go a dumb
+way, and simply keep a list of all explored ways, and check every choice we
+make against the already explored paths, skipping the ones we already did.
+
+Now, does the exploration order matter? I.e. should we keep just the
+subgraphs, or should we keep the actual paths, i.e. the sequences? Just the
+subgraphs don't specify which choice was going to be taken next. We can
+actually match the same pattern subgraph to the same subgraph in multiple
+ways, and either hit a dead end, or proceed to a full match, depending on
+which nodes are remaining and were going to be picked next.
+
+So it seems we should be comparing paths. Aargh. Or perhaps we can do it
+implicitly by structuring our exploration as the program flow.
+
+OK, let's build the simplest loop we can, explicitly going over *all* possible
+combinations, and we can add discarding dead ends we can predict, later.
+
+To explore one way we take each remaining pattern node and try start matching
+the pattern from every node in turn, until we match all reachable nodes, then
+we repeat until we match the complete pattern.
+
+So, what we need to do, we need to try all remaining pattern nodes after each
+completed component, including none.
+
+And also, we need to try every unexplored edge from every node in every one of
+these traversals.
+
+And we need to record every complete match doing that.
+
+Seems straightforward enough. But so it did all the previous attempts at
+solving this. Anyway, we can only go forward if we try this.
+
+So we can have a function which has its own copy of the remaining pattern to
+try, so it could call itself recursively after completing each component, with
+smaller and smaller remaining pattern.
+
+Then we can have a function which matches a node, and calls itself with a new
+node to match, as it tries every edge in turn. Once that function hits a node
+without any edges remaining (minus the one we arrived at), it has to call the
+above function to start collecting remaining components.
+
+That's a little backwards (because the first function is higher-order), but
+this is how we can keep all the state (on the stack).
+
+Soooooo:
+
+match_component(remaining_pattern_graph, remaining_graph):
+    For each pattern_node in remaining_pattern_graph:
+        For each node in remaining_graph:
+            match_node(remaining_pattern_graph, remaining_graph,
+                       pattern_node, node)
+
+match_node(remaining_pattern_graph, remaining_graph,
+           pattern_node, node):
+    If not pattern_node.matches(node):
+        return False
+    If pattern_node has no edges in remaining_pattern_graph:
+        remaining_pattern_graph.remove(pattern_node)
+        remaining_graph.remove(node)
+        return match_components(remaining_pattern_graph, remaining_graph)
+    return match_edges(remaining_pattern_graph, remaining_graph,
+                       pattern_node, node)
+
+match_edges(remaining_pattern_graph, remaining_graph,
+            pattern_node, node):
+    For each pattern_edge connected to pattern_node:
+        For each edge connected to node:
+            If pattern_edge.matches(edge):
+                edge_removed_pattern_graph = remaining_pattern_graph.remove(pattern_edge)
+                edge_removed_graph = remaining_graph.remove(edge)
+                if not match_node(edge_removed_pattern_graph, edge_removed_graph,
+                                  pattern_edge.other_node, edge.other_node):
+                    return False
+                if not match_edges(edge_removed_pattern_graph, edge_removed_graph,
+                                   pattern_node, node):
+                    return False
+---
+
+So we would go over each edge connected to a node and try to match them in a
+particular combination, and when a combination is complete, we have to return
+with that combination removed...
+
+Ah wait, we're not returning, we're only descending. We *never* return
+modified remaining graphs to the caller, as we're simply descending down the
+stack, *always*.
+
+---
+We have one call per pattern edge
+In that call we make a copy of the graph and take each edge in turn
+and call ourselves with the rest
+---
+So the functions above return False only if the remaining pattern graph
+doesn't match the remaining graph *at all*. That is they exhausted all
+combinations of the pattern subgraph and the subgraph given to them.
+They return True if at least one combination matched.
+---
+How do we determine that we've traversed the complete component and call
+another match_components()?
+
+I mean, the match_node function can hit a dead end even if there are more
+branches to explore for the current component.
+
+Waaaait, we won't really explore all the combinations if we only ever go over
+all the options in each single function.
+
+What if we e.g. use coroutines and yield after each branch had matched, before
+making another choice?
+---
+A   1
+B   2
+C   3
+D   4
+E   5
+
+
+A2
+B1
+C3
+
+We have one call per pattern edge
+In that call we make a copy of the graph and take each edge in turn
+and call ourselves with the rest
+---
+We need to explore all possible permutations, and record complete matches. A
+complete match is when all nodes and edges of the pattern graph have found
+corresponding nodes and edges.
+
+What if we imagine each node and edge as a function call, which can yield a
+remaining (pattern) graph pair whenever it succesfully matches all connected
+nodes and edges, and stops once it runs out of options?
+
+Would this represent the decision tree?
+
+Thus the call with the first node pair would yield a complete match? Wait,
+what about components? The top iterator can determine that component matching
+should continue.
+
+So, something like:
+
+match_components(rem_pattern_graph, rem_graph):
+    if rem_pattern_graph.is_null():
+        yield rem_pattern_graph, rem_graph
+    else:
+        for each pattern_node in rem_pattern_graph:
+            for each node in rem_graph:
+                for new_rem_pattern_graph, new_rem_graph in match_node(
+                    rem_pattern_graph.copy(), rem_graph.copy(),
+                    pattern_node, node
+                ):
+                    yield from match_components(new_rem_pattern_graph, new_rem_graph)
+
+
+match_node(rem_pattern_graph, rem_graph, pattern_node, node):
+    If pattern_node.matches(node):
+        If pattern_node has no edges in rem_pattern_graph:
+            rem_pattern_graph.remove(pattern_node)
+            rem_graph.remove(node)
+            yield rem_pattern_graph, rem_graph
+        else:
+            yield from match_edges(
+                rem_pattern_graph, rem_graph, pattern_node, node
+            )
+
+
+match_edges(rem_pattern_graph, rem_graph, pattern_node, node):
+    For each pattern_edge connected to pattern_node in rem_pattern_graph:
+        For each edge connected to node in rem_graph:
+            If pattern_edge.matches(edge):
+                edge_rem_pattern_graph = rem_pattern_graph.copy().remove(pattern_node)
+                edge_rem_graph = rem_graph.copy().remove(node)
+                for node_rem_pattern_graph, node_rem_graph in match_node(
+                    edge_rem_pattern_graph, edge_rem_graph,
+                    pattern_edge.other_node, edge.other_node
+                ):
+                    yield from match_edges(node_rem_pattern_graph, node_rem_graph,
+                                           pattern_node, node)
+
+When going down the edge, we gotta remove both the origin node and the
+traversed edge. When exploring the rest of the edges, we should have only the
+explored node and its nodes and edges removed.
+
+Because we can't have a node removed without its edges being removed as well,
+we need to switch to keeping the original and the matched (pattern) graph,
+instead of just the remaining graph.
+
+Therefore:
+
+match_components(pattern_graph, graph, matched_pattern_graph, matched_graph):
+    if matched_pattern_graph == pattern_graph:
+        yield matched_pattern_graph, matched_graph
+    else:
+        rem_pattern_graph = pattern_graph - matched_pattern_graph
+        rem_graph = graph - matched_graph
+        for each pattern_node in rem_pattern_graph:
+            for each node in rem_graph:
+                for new_matched_pattern_graph, new_matched_graph in match_node(
+                    pattern_graph, graph,
+                    matched_pattern_graph.copy(), matched_graph.copy(),
+                    pattern_node, node
+                ):
+                    yield from match_components(
+                        pattern_graph, graph,
+                        new_matched_pattern_graph, new_matched_graph
+                    )
+
+
+match_node(pattern_graph, graph, matched_pattern_graph, matched_graph, pattern_node, node):
+    If pattern_node.matches(node):
+        If matched_pattern_graph.get_degree(pattern_node)  == pattern_graph.get_degree(pattern_node):
+            matched_pattern_graph.add(pattern_node)
+            matched_graph.add(node)
+            yield matched_pattern_graph, matched_graph
+        else:
+            yield from match_edges(
+                pattern_graph, graph,
+                matched_pattern_graph, matched_graph,
+                pattern_node, node
+            )
+
+
+match_edges(pattern_graph, graph, matched_pattern_graph, matched_graph, pattern_node, node):
+    for pattern_edge in (
+        pattern_graph.get_edges(pattern_node) -
+        matched_pattern_graph.get_edges(pattern_node)
+    ):
+        for edge in (graph.get_edges(node) - matched_graph.get_edges(node)):
+            If pattern_edge.matches(edge):
+                edge_matched_pattern_graph = matched_pattern_graph.copy().add(pattern_node)
+                edge_matched_graph = matched_graph.copy().add(node)
+                # Aah, we've got a problem here:
+                # We can't add an edge to a graph without adding *both* nodes
+                # it connects. Should we have only match_edges() function, then?
+                for node_matched_pattern_graph, node_matched_graph in match_node(
+                    edge_matched_pattern_graph, edge_matched_graph,
+                    pattern_edge.other_node, edge.other_node
+                ):
+                    yield from match_edges(node_matched_pattern_graph, node_matched_graph,
+                                           pattern_node, node)
+
+---
+Let's try to solve the above comment:
+
+match_components(pattern_graph, graph, matched_pattern_graph, matched_graph):
+    if matched_pattern_graph == pattern_graph:
+        yield matched_graph
+    else:
+        rem_pattern_graph = pattern_graph - matched_pattern_graph
+        rem_graph = graph - matched_graph
+        for each pattern_node in rem_pattern_graph:
+            for each node in rem_graph:
+                if not pattern_node.matches(node):
+                    continue
+                for new_matched_pattern_graph, new_matched_graph in match_edges(
+                    pattern_graph, graph,
+                    matched_pattern_graph.copy().add(pattern_node),
+                    matched_graph.copy().add(node),
+                    pattern_node, node
+                ):
+                    yield from match_components(
+                        pattern_graph, graph,
+                        new_matched_pattern_graph, new_matched_graph
+                    )
+
+
+match_edges(pattern_graph, graph, matched_pattern_graph, matched_graph, pattern_node, node):
+    assert pattern_node.matches(node):
+    assert pattern_node in matched_pattern_graph
+    assert node in matched_graph
+    rem_pattern_edges = pattern_graph.get_edges(pattern_node) - \
+        matched_pattern_graph.get_edges(pattern_node)
+    If not rem_pattern_edges:
+        yield matched_pattern_graph, matched_graph
+    else:
+        rem_edges = graph.get_edges(node) - matched_graph.get_edges(node)
+        for pattern_edge in rem_pattern_edges:
+            for edge in rem_edges:
+                if pattern_edge.matches(edge) and pattern_edge.other_node.matches(edge.other_node):
+                    yield from match_edges(
+                        matched_pattern_graph.copy().add(pattern_edge),
+                        matched_graph.copy().add(edge),
+                        pattern_edge.other_node, edge.other_node
+                    )
+
