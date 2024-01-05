@@ -2,9 +2,9 @@
 KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 """
 
-from typing import Dict, Set, Union, Optional, Tuple
+from typing import Final, Generator, Dict, Set, Union, Optional, Tuple
 from functools import reduce
-from copy import copy
+from itertools import chain
 import graphviz  # type: ignore
 
 # Calm down, pylint: disable=too-few-public-methods
@@ -33,8 +33,8 @@ class Element:
             for n, v in attrs.items()
         )
         self.attrs = attrs.copy()
+        # Oh, really, pylint: disable=global-statement
         global ELEMENT_ID_NEXT
-        global ELEMENT_ID_MAP
         # Avoid actual reference to the element
         ELEMENT_ID_MAP[id(self)] = ELEMENT_ID_NEXT
         ELEMENT_ID_NEXT += 1
@@ -221,7 +221,6 @@ class Graph:
 
         def format_label(element: Element):
             """Format a label for a graphviz element"""
-            global ELEMENT_ID_MAP
             return "\n".join(
                 [str(ELEMENT_ID_MAP[id(element)])] +
                 [f"{quote(n)}={quote(trim(v))}"
@@ -256,10 +255,7 @@ class Graph:
         assert node in self.nodes
         return set(filter(lambda e: node in (e.source, e.target), self.edges))
 
-    def detailed_match(self, other: "Graph") -> Tuple[
-        Optional[Dict[Node, Set[Node]]],
-        Optional[Dict[Edge, Set[Edge]]]
-    ]:
+    def detailed_match(self, other: "Graph") -> Dict[Element, Set[Element]]:
         """
         Find all matches of this graph as a pattern against another graph.
 
@@ -272,13 +268,177 @@ class Graph:
             other:  The graph to match this graph against.
 
         Returns:
-            None, None if no matches were found,
-            or two dictionaries containing:
-            * nodes from this vs. sets of matching nodes from the other graph;
-            * edges from this vs. sets of matching edges from the other graph.
+            A dictionary of each element from this graph, used as a pattern,
+            and the set of all elements it matched in the other graph,
+            or None, if no matches were found.
         """
+        def match_components(matches: Dict[Element, Element],
+                             self_node: Node, other_node: Node) -> \
+                Generator[Dict[Element, Element], None, None]:
+            """
+            Find all subgraphs of a component of the other graph fully
+            matching a component of this graph, used as a pattern.
 
+            A component is defined as a node (assumed matching, and in
+            "matches"), all nodes reachable from it, and all edges in between,
+            minus whatever is already in "matches".
 
+            Args:
+                matches:        A dictionary of each element from this graph,
+                                used as a pattern, and the element of the
+                                other graph that has matched so far.
+                self_node:      The node belonging to the pattern component of
+                                this graph. Must match "other_node", and be in
+                                "matched_self".
+                other_node:     The node belonging to the component of the
+                                other graph, to be matched. Must be matched by
+                                "self_node", and be in "matched_other".
+
+            Yields:
+                A dictionary of each element from this graph, used as a
+                pattern, and the matched element of the other graph
+                ("matches"), whenever a component match is complete.
+            """
+            assert isinstance(matches, dict)
+            assert all(type(s) is type(o) and
+                       isinstance(s, Element) and
+                       s in self.nodes and o in other.nodes or
+                       s in self.edges and o in other.edges
+                       for s, o in matches.items())
+            self_matches: Final[Set] = set(matches.keys())
+            other_matches: Final[Set] = set(matches.values())
+            assert all(
+                s.source in self_matches and s.target in self_matches
+                for s in self_matches if isinstance(s, Edge)
+            )
+            assert all(
+                o.source in other_matches and o.target in other_matches
+                for o in other_matches if isinstance(o, Edge)
+            )
+            assert matches.get(self_node) is other_node
+
+            #import inspect
+            #indent = '    ' * len(inspect.stack())
+            #print(f"{indent}match_components"
+            #      f"{(matches, self_node, other_node)}")
+
+            rem_self_edges = self.get_incident_edges(self_node) - self_matches
+
+            # If there are no edges left to match
+            if not rem_self_edges:
+                #print(f"{indent}<- {matches}")
+                yield matches
+                return
+
+            rem_other_edges = other.get_incident_edges(other_node) - \
+                other_matches
+
+            # For every combination of self and other edges
+            for self_edge in rem_self_edges:
+                self_adj_node = self_edge.get_adjacent_node(self_node)
+                self_adj_matched = self_adj_node in self_matches
+                for other_edge in rem_other_edges:
+                    other_adj_node = other_edge.get_adjacent_node(other_node)
+                    other_adj_matched = other_adj_node in other_matches
+                    # If edge directions or attributes mismatch,
+                    # or the adjacent node already matched something else
+                    if not (
+                        self_edge.is_incoming(self_node) ==
+                        other_edge.is_incoming(other_node) and
+                        self_edge.matches(other_edge) and
+                        self_adj_matched == other_adj_matched and
+                        matches.get(self_adj_node, other_adj_node) is
+                        other_adj_node
+                    ):
+                        continue
+
+                    # If the adjacents matched already
+                    if self_adj_node in matches:
+                        # Match remaining edges
+                        yield from match_components(
+                            matches | {self_edge: other_edge},
+                            self_node, other_node
+                        )
+                        continue
+
+                    # If the adjacents don't match
+                    if not self_adj_node.matches(other_adj_node):
+                        continue
+
+                    # For each adjacent subgraph match
+                    for new_matches in match_components(
+                            matches | {self_edge: other_edge,
+                                       self_adj_node: other_adj_node},
+                            self_adj_node, other_adj_node
+                    ):
+                        # Match remaining edges
+                        yield from match_components(
+                            new_matches, self_node, other_node
+                        )
+
+        def match_subgraphs(matches: Dict[Element, Element]) -> \
+                Generator[Dict[Element, Element], None, None]:
+            """
+            Match this graph, used as a pattern, to subgraphs in the other.
+
+            Args:
+                matches:    A dictionary of each element from this graph, used
+                            as a pattern, and the element of the other graph
+                            that has matched so far.
+
+            Yields:
+                A dictionary of each element from this graph, used as a
+                pattern, and the matched element of the other graph
+                ("matches"), whenever this graph matches completely.
+            """
+            assert isinstance(matches, dict)
+            assert all(type(s) is type(o) and
+                       s in self.nodes and o in other.nodes or
+                       s in self.edges and o in other.edges
+                       for s, o in matches.items())
+            self_matches: Final[Set] = set(matches.keys())
+            other_matches: Final[Set] = set(matches.values())
+            assert all(
+                s.source in self_matches and s.target in self_matches
+                for s in self_matches if isinstance(s, Edge)
+            )
+            assert all(
+                o.source in other_matches and o.target in other_matches
+                for o in other_matches if isinstance(o, Edge)
+            )
+
+            #import inspect
+            #indent = '    ' * len(inspect.stack())
+            #print(f"{indent}match_subgraphs({matches})")
+            if self_matches == (self.nodes | self.edges):
+                #print(f"{indent}<- {matches}")
+                yield matches
+                return
+            rem_self_nodes = self.nodes - self_matches
+            rem_other_nodes = other.nodes - other_matches
+            for self_node in rem_self_nodes:
+                for other_node in rem_other_nodes:
+                    # If the nodes don't match
+                    if not self_node.matches(other_node):
+                        continue
+                    # For each component match
+                    for new_matches in match_components(
+                        matches | {self_node: other_node},
+                        self_node, other_node
+                    ):
+                        # Match the remaining components
+                        yield from match_subgraphs(new_matches)
+
+        return reduce(
+            lambda x, y: {
+                k: (x or {}).get(k, set()) | y.get(k, set())
+                for k in set(x or {}) | set(y)
+            },
+            map(lambda x: {k: {v} for k, v in x.items()},
+                match_subgraphs({})),
+            # Yes, we can handle None, mypy
+            None # type: ignore
+        )
 
     def match(self, other: "Graph") -> Optional["Graph"]:
         """
@@ -291,146 +451,5 @@ class Graph:
             A graph containing nodes and edges from all matches,
             or None, if no matches were found.
         """
-        # TODO: Move to detailed_match()
-        def match_components(matched_self, matched_other, self_node, other_node):
-            """
-            Find all subgraphs of a component of the other graph fully
-            matching a component of this graph, used as a pattern.
-
-            A component is defined as a node (assumed matching, and in
-            corresonding matched_* graph), all nodes reachable from it, and
-            all edges in between, minus whatever is already in the
-            corresponding matched_* graph.
-
-            Args:
-                matched_self:   The graph containing matched elements of this
-                                graph used as a pattern. Could be modified.
-                matched_other:  The graph containing matched elements of the
-                                other graph. Could be modified.
-                self_node:      The node belonging to the pattern component of
-                                this graph. Must match "other_node", and be in
-                                "matched_self".
-                other_node:     The node belonging to the component of the
-                                other graph, to be matched. Must be matched by
-                                "self_node", and be in "matched_other".
-
-            Yields:
-                A graph containing matching pattern elements from this graph
-                ("matched_self"), and a graph containing matched elements from
-                the other graph ("matched_other"), whenever a component match
-                is complete.
-            """
-            assert self_node.matches(other_node)
-            assert self_node in matched_self.nodes
-            assert other_node in matched_other.nodes
-
-            import inspect
-            indent = '    ' * len(inspect.stack())
-            print(f"{indent}match_components"
-                  f"{(matched_self, matched_other, self_node, other_node)}")
-
-            rem_self_edges = self.get_incident_edges(self_node) - \
-                matched_self.get_incident_edges(self_node)
-
-            # If there are no edges left to match
-            if not rem_self_edges:
-                print(f"{indent}<- {(matched_self, matched_other)}")
-                yield matched_self, matched_other
-                return
-
-            rem_other_edges = other.get_incident_edges(other_node) - \
-                matched_other.get_incident_edges(other_node)
-            # For every combination of self and other edges
-            for self_edge in rem_self_edges:
-                for other_edge in rem_other_edges:
-                    self_adj_node = self_edge.get_adjacent_node(self_node)
-                    other_adj_node = other_edge.get_adjacent_node(other_node)
-                    self_adj_matched = self_adj_node in matched_self.nodes
-                    other_adj_matched = other_adj_node in matched_other.nodes
-                    print(f"{indent}# "
-                          f"{'-+'[self_adj_matched]}{self_adj_node} / "
-                          f"{'-+'[other_adj_matched]}{other_adj_node}")
-                    # If edge directions, attributes, or availability mismatch
-                    if not (
-                        self_edge.is_incoming(self_node) == \
-                        other_edge.is_incoming(other_node) and \
-                        self_edge.matches(other_edge) and \
-                        self_adj_matched == other_adj_matched
-                    ):
-                        continue
-
-                    # If the adjacent matched already
-                    if self_adj_matched:
-                        # Match remaining edges
-                        yield from match_components(
-                            copy(matched_self).add(self_edge),
-                            copy(matched_other).add(other_edge),
-                            self_node, other_node
-                        )
-                        continue
-
-                    # If the adjacent doesn't match
-                    if not self_adj_node.matches(other_adj_node):
-                        continue
-
-                    # For each adjacent subgraph match
-                    for new_matched_self, new_matched_other in match_components(
-                            # NOTE: Adding the edge adds connected nodes
-                            copy(matched_self).add(self_edge),
-                            copy(matched_other).add(other_edge),
-                            self_adj_node, other_adj_node
-                    ):
-                        # Match remaining edges
-                        yield from match_components(
-                            new_matched_self, new_matched_other,
-                            self_node, other_node
-                        )
-
-        # TODO: Move to detailed_match()
-        def match_subgraphs(matched_self, matched_other):
-            """
-            Match this graph, used as a pattern, to subgraphs in the other.
-
-            Args:
-                matched_self:   The graph containing matched elements of this
-                                graph used as a pattern. Could be modified.
-                matched_other:  The graph containing matched elements of the
-                                other graph. Could be modified.
-
-            Yields:
-                Subgraphs of the other graph which are completely matched by
-                this graph being used as a pattern.
-            """
-            import inspect
-            indent = '    ' * len(inspect.stack())
-            print(f"{indent}match_subgraphs"
-                  f"{(matched_self, matched_other)}")
-            if matched_self == self:
-                print(f"{indent}<- {(matched_other,)}")
-                yield matched_other
-                return
-            rem_self_nodes = self.nodes - matched_self.nodes
-            rem_other_nodes = other.nodes - matched_other.nodes
-            for self_node in rem_self_nodes:
-                for other_node in rem_other_nodes:
-                    if not self_node.matches(other_node):
-                        continue
-                    # For each component match
-                    for new_matched_self, new_matched_other in \
-                            match_components(
-                                copy(matched_self).add(self_node),
-                                copy(matched_other).add(other_node),
-                                self_node, other_node
-                            ):
-                        # Match the remaining components
-                        yield from match_subgraphs(new_matched_self,
-                                                   new_matched_other)
-
-        # TODO: Rewrite to use detailed_match(), i.e.:
-        # nodes, edges = self.detailed_match(other)
-        # return Graph(nodes=nodes, edges=edges)
-        return reduce(
-            lambda x, y: (x or Graph()) | y,
-            match_subgraphs(Graph(), Graph()),
-            None
-        )
+        matches = self.detailed_match(other)
+        return None if matches is None else Graph(*chain(*matches.values()))
