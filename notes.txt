@@ -1618,3 +1618,18 @@ match_edges(pattern_graph, graph, matched_pattern_graph, matched_graph, pattern_
                         pattern_edge.other_node, edge.other_node
                     )
 
+---
+Great! Seems to work so far!
+
+Now we need to redo the matching results. We need to return each complete
+match *separately* and then connect the nodes found in *each* of them, not
+simply all nodes matched by particular nodes together. That would be too many
+connections.
+
+So:
+create a copy of the graph
+add all new nodes and completely new edges
+for each subgraph match:
+    create the half-new edges
+if there were no matches:
+    discard

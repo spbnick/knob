@@ -6,6 +6,7 @@ from typing import Final, Generator, Dict, Set, Union, Optional, Tuple
 from functools import reduce
 from itertools import chain
 import graphviz  # type: ignore
+import inspect
 
 # Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal
@@ -16,6 +17,10 @@ ELEMENT_ID_NEXT = 1
 # A dictionary of created element object IDs and their sequential IDs
 ELEMENT_ID_MAP = {}
 
+
+def _print_stack_indented(*args, **kwargs):
+    indent = '    ' * (len(inspect.stack()) - 1)
+    print(indent[:-1], *args, **kwargs)
 
 class Element:
     """A graph's element (node/edge)"""
@@ -255,22 +260,18 @@ class Graph:
         assert node in self.nodes
         return set(filter(lambda e: node in (e.source, e.target), self.edges))
 
-    def detailed_match(self, other: "Graph") -> Dict[Element, Set[Element]]:
+    def detailed_match(self, other: "Graph") -> \
+            Generator[Dict[Element, Element], None, None]:
         """
-        Find all matches of this graph as a pattern against another graph.
-
-        Return a dictionary of nodes and a dictionary of edges from this graph
-        and sets of matching nodes/edges respectively, from the other graph.
-
-        Return None, None if no matches were found.
+        Find all matches of this graph, as a pattern, against another graph.
 
         Args:
             other:  The graph to match this graph against.
 
-        Returns:
+        Yields:
             A dictionary of each element from this graph, used as a pattern,
-            and the set of all elements it matched in the other graph,
-            or None, if no matches were found.
+            and the matched element of the other graph, whenever this graph
+            matches completely.
         """
         def match_components(matches: Dict[Element, Element],
                              self_node: Node, other_node: Node) -> \
@@ -317,16 +318,14 @@ class Graph:
             )
             assert matches.get(self_node) is other_node
 
-            #import inspect
-            #indent = '    ' * len(inspect.stack())
-            #print(f"{indent}match_components"
-            #      f"{(matches, self_node, other_node)}")
+            #_print_stack_indented(f"match_components"
+            #                      f"{(matches, self_node, other_node)}")
 
             rem_self_edges = self.get_incident_edges(self_node) - self_matches
 
             # If there are no edges left to match
             if not rem_self_edges:
-                #print(f"{indent}<- {matches}")
+                #_print_stack_indented(f"<- {matches}")
                 yield matches
                 return
 
@@ -407,11 +406,9 @@ class Graph:
                 for o in other_matches if isinstance(o, Edge)
             )
 
-            #import inspect
-            #indent = '    ' * len(inspect.stack())
-            #print(f"{indent}match_subgraphs({matches})")
+            #_print_stack_indented(f"match_subgraphs({matches})")
             if self_matches == (self.nodes | self.edges):
-                #print(f"{indent}<- {matches}")
+                #_print_stack_indented(f"<- {matches}")
                 yield matches
                 return
             rem_self_nodes = self.nodes - self_matches
@@ -429,27 +426,28 @@ class Graph:
                         # Match the remaining components
                         yield from match_subgraphs(new_matches)
 
-        return reduce(
-            lambda x, y: {
-                k: (x or {}).get(k, set()) | y.get(k, set())
-                for k in set(x or {}) | set(y)
-            },
-            map(lambda x: {k: {v} for k, v in x.items()},
-                match_subgraphs({})),
-            # Yes, we can handle None, mypy
-            None # type: ignore
-        )
+        #_print_stack_indented(f"detailed_match{(self, other)}")
+        # TODO: Something smarter than this
+        unique_matches = set()
+        for matches in match_subgraphs({}):
+            unique_matches.add(frozenset(matches.items()))
+        for matches in unique_matches:
+            matches = dict(matches)
+            #_print_stack_indented(f"<- {matches}")
+            yield matches
 
-    def match(self, other: "Graph") -> Optional["Graph"]:
+    def match(self, other: "Graph") -> Generator["Graph", None, None]:
         """
         Find all matches of this graph as a pattern against another graph.
 
         Args:
             other:  The graph to match this graph against.
 
-        Returns:
-            A graph containing nodes and edges from all matches,
-            or None, if no matches were found.
+        Yields:
+            Subgraphs of the other graph that match this graph.
         """
-        matches = self.detailed_match(other)
-        return None if matches is None else Graph(*chain(*matches.values()))
+        #_print_stack_indented(f"match{(self, other)}")
+        for matches in self.detailed_match(other):
+            g = Graph(*matches.values())
+            #_print_stack_indented(f"<- {g}")
+            yield g

@@ -9,36 +9,36 @@ from knob5 import Graph as G
 
 
 def test_match_empty_both():
-    assert G().match(G()) == G()
+    assert set(G().match(G())) == {G()}
 
 
 def test_match_empty_to_non_empty():
-    assert G().match(G(E(N(x=1), N(x=2)))) == G()
+    assert set(G().match(G(E(N(x=1), N(x=2))))) == {G()}
 
 
 def test_match_non_empty_to_empty():
-    assert G(E(N(x=1), N(x=2))).match(G()) is None
+    assert set(G(E(N(x=1), N(x=2))).match(G())) == set()
 
 
 def test_match_one_node():
     g = G(N())
-    assert G(N()).match(g) == g
-    assert G(N(y=2)).match(g) is None
+    assert set(G(N()).match(g)) == {g}
+    assert set(G(N(y=2)).match(g)) == set()
     g = G(N(x=1))
-    assert G(N()).match(g) == g
-    assert G(N(x=1)).match(g) == g
-    assert G(N(x=2)).match(g) is None
-    assert G(N(y=2)).match(g) is None
+    assert set(G(N()).match(g)) == {g}
+    assert set(G(N(x=1)).match(g)) == {g}
+    assert set(G(N(x=2)).match(g)) == set()
+    assert set(G(N(y=2)).match(g)) == set()
     g = G(N(x=1, y=2))
-    assert G(N()).match(g) == g
-    assert G(N(x=1)).match(g) == g
-    assert G(N(x=2)).match(g) is None
-    assert G(N(y=2)).match(g) == g
-    assert G(N(y=1)).match(g) is None
-    assert G(N(x=1, y=2)).match(g) == g
-    assert G(N(x=2, y=2)).match(g) is None
-    assert G(N(x=1, y=1)).match(g) is None
-    assert G(N(x=2, y=1)).match(g) is None
+    assert set(G(N()).match(g)) == {g}
+    assert set(G(N(x=1)).match(g)) == {g}
+    assert set(G(N(x=2)).match(g)) == set()
+    assert set(G(N(y=2)).match(g)) == {g}
+    assert set(G(N(y=1)).match(g)) == set()
+    assert set(G(N(x=1, y=2)).match(g)) == {g}
+    assert set(G(N(x=2, y=2)).match(g)) == set()
+    assert set(G(N(x=1, y=1)).match(g)) == set()
+    assert set(G(N(x=2, y=1)).match(g)) == set()
 
 
 def test_match_two_nodes():
@@ -46,40 +46,40 @@ def test_match_two_nodes():
     n1_b = N(n=1)
     n1 = n1_a
     n2 = N(n=2)
-    assert G(N(n=1)).match(G(n1_a, n2)) == G(n1_a)
-    assert G(N(n=1)).match(G(n1_b, n2)) == G(n1_b)
-    assert G(N(n=1)).match(G(n1_a, n1_b)) == G(n1_a, n1_b)
-    assert G(N()).match(G(n1_a, n1_b)) == G(n1_a, n1_b)
-    assert G(N()).match(G(n1, n2)) == G(n1, n2)
-    assert G(N(n=1), N(n=2)).match(G(n1, n2)) == G(n1, n2)
-    assert G(N(n=1), N(n=3)).match(G(n1, n2)) is None
-    assert G(N(n=3)).match(G(n1, n2)) is None
+    assert set(G(N(n=1)).match(G(n1_a, n2))) == {G(n1_a)}
+    assert set(G(N(n=1)).match(G(n1_b, n2))) == {G(n1_b)}
+    assert set(G(N(n=1)).match(G(n1_a, n1_b))) == {G(n1_a),G(n1_b)}
+    assert set(G(N()).match(G(n1_a, n1_b))) == {G(n1_a),G( n1_b)}
+    assert set(G(N()).match(G(n1, n2))) == {G(n1), G(n2)}
+    assert set(G(N(n=1), N(n=2)).match(G(n1, n2))) == {G(n1, n2)}
+    assert set(G(N(n=1), N(n=3)).match(G(n1, n2))) == set()
+    assert set(G(N(n=3)).match(G(n1, n2))) == set()
 
 
 def test_match_one_edge():
     e = E(N(x=1), N(x=2))
-    assert G(e).match(G(e)) == G(e)
-    assert G(E(N(x=1), N(x=2))).match(G(e)) == G(e)
-    assert G(E(N(x=2), N(x=1))).match(G(e)) is None
-    assert G(E(N(), N(x=2))).match(G(e)) == G(e)
-    assert G(E(N(x=2), N())).match(G(e)) is None
-    assert G(E(N(x=1), N())).match(G(e)) == G(e)
-    assert G(E(N(), N(x=1))).match(G(e)) is None
-    assert G(E(N(), N())).match(G(e)) == G(e)
-    assert G(E(N(x=1), N(x=3))).match(G(e)) is None
-    assert G(E(N(x=3), N(x=2))).match(G(e)) is None
-    assert G(E(N(x=1), N(x=2), y=1)).match(G(e)) is None
+    assert set(G(e).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=1), N(x=2))).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N(x=1))).match(G(e))) == set()
+    assert set(G(E(N(), N(x=2))).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N())).match(G(e))) == set()
+    assert set(G(E(N(x=1), N())).match(G(e))) == {G(e)}
+    assert set(G(E(N(), N(x=1))).match(G(e))) == set()
+    assert set(G(E(N(), N())).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=1), N(x=3))).match(G(e))) == set()
+    assert set(G(E(N(x=3), N(x=2))).match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2), y=1)).match(G(e))) == set()
 
     e = E(N(x=1), N(x=2), y=1)
-    assert G(E(N(), N(), y=1)).match(G(e)) == G(e)
-    assert G(E(N(), N())).match(G(e)) == G(e)
-    assert G(E(N(x=1), N(x=2), y=1)).match(G(e)) == G(e)
-    assert G(E(N(x=2), N(x=1), y=1)).match(G(e)) is None
-    assert G(E(N(x=1), N(x=2))).match(G(e)) == G(e)
-    assert G(E(N(x=2), N(x=1))).match(G(e)) is None
-    assert G(E(N(x=1), N(x=2), y=2)).match(G(e)) is None
-    assert G(E(N(), N(), y=2)).match(G(e)) is None
-    assert G(E(N(x=1), N(x=2), z=3)).match(G(e)) is None
+    assert set(G(E(N(), N(), y=1)).match(G(e))) == {G(e)}
+    assert set(G(E(N(), N())).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=1), N(x=2), y=1)).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N(x=1), y=1)).match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2))).match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N(x=1))).match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2), y=2)).match(G(e))) == set()
+    assert set(G(E(N(), N(), y=2)).match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2), z=3)).match(G(e))) == set()
 
 
 def test_match_self_loop():
@@ -94,14 +94,14 @@ def test_match_self_loop():
     ep11 = E(np1, np1)
     ep22 = E(np2, np2)
     ep12 = E(np1, np2)
-    assert G(ep11).match(G(e11)) == G(e11)
-    assert G(ep11).match(G(e11, e22)) == G(e11, e22)
-    assert G(ep11, ep22).match(G(e11, e22)) == G(e11, e22)
-    assert G(ep11, ep22).match(G(e11, e22, e12)) == G(e11, e22)
-    assert G(ep12).match(G(e11, e22, e12)) == G(e12)
-    assert G(ep12).match(G(e11, e22)) is None
-    assert G(ep11, ep22).match(G(e11)) is None
-    assert G(ep11, ep22).match(G(e22)) is None
+    assert set(G(ep11).match(G(e11))) == {G(e11)}
+    assert set(G(ep11).match(G(e11, e22))) == {G(e11), G(e22)}
+    assert set(G(ep11, ep22).match(G(e11, e22))) == {G(e11, e22)}
+    assert set(G(ep11, ep22).match(G(e11, e22, e12))) == {G(e11, e22)}
+    assert set(G(ep12).match(G(e11, e22, e12))) == {G(e12)}
+    assert set(G(ep12).match(G(e11, e22))) == set()
+    assert set(G(ep11, ep22).match(G(e11))) == set()
+    assert set(G(ep11, ep22).match(G(e22))) == set()
 
 
 def test_match_loops():
@@ -110,47 +110,50 @@ def test_match_loops():
     np = [N() for np in range(0, 4)]
     ep = [[E(np1, np2) for np2 in np] for np1 in np]
 
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
         G(e[0][1], e[1][2], e[2][0])
-    ) == G(e[0][1], e[1][2], e[2][0])
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(
+    )) == {G(e[0][1], e[1][2], e[2][0])}
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
         G(e[0][1], e[1][2], e[0][2])
-    ) is None
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(
+    )) == set()
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
         G(e[0][1], e[1][2], e[2][0], e[2][3])
-    ) == G(e[0][1], e[1][2], e[2][0])
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(
+    )) == {G(e[0][1], e[1][2], e[2][0])}
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
         G(e[0][1], e[1][2], e[2][0], e[2][3], e[3][1])
-    ) == G(e[0][1], e[1][2], e[2][0], e[2][3], e[3][1])
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(
+    )) == {
+        G(e[0][1], e[1][2], e[2][0]),
+        G(e[1][2], e[2][3], e[3][1])
+    }
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
         G(e[0][1], e[1][2], e[2][0], e[2][3], e[1][3])
-    ) == G(e[0][1], e[1][2], e[2][0])
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(
+    )) == {G(e[0][1], e[1][2], e[2][0])}
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
         G(e[0][1], e[1][2], e[0][2], e[2][3], e[1][3])
-    ) is None
-    assert G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).match(
+    )) == set()
+    assert set(G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).match(
         G(e[0][1], e[1][2], e[2][3], e[3][0])
-    ) == G(e[0][1], e[1][2], e[2][3], e[3][0])
-    assert G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).match(
+    )) == {G(e[0][1], e[1][2], e[2][3], e[3][0])}
+    assert set(G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).match(
         G(e[1][0], e[2][1], e[3][2], e[0][3])
-    ) == G(e[1][0], e[2][1], e[3][2], e[0][3])
+    )) == {G(e[1][0], e[2][1], e[3][2], e[0][3])}
 
-    assert G(ep[0][1], ep[1][0]).match(
+    assert set(G(ep[0][1], ep[1][0]).match(
         G(e[1][0], e[0][1], e[2][3], e[3][2])
-    ) == G(e[1][0], e[0][1], e[2][3], e[3][2])
+    )) == {G(e[1][0], e[0][1]), G(e[2][3], e[3][2])}
 
-    assert G(ep[0][0]).match(
+    assert set(G(ep[0][0]).match(
         G(e[1][0], e[0][1])
-    ) is None
+    )) == set()
 
-    assert G(ep[0][1], ep[1][0]).match(
+    assert set(G(ep[0][1], ep[1][0]).match(
         G(e[0][1], e[1][2], e[2][0])
-    ) is None
+    )) == set()
 
-    assert G(ep[0][0]).match(
+    assert set(G(ep[0][0]).match(
         G(e[0][1], e[1][2], e[2][0],
           e[0][0], e[1][1], e[2][2])
-    ) == G(e[0][0], e[1][1], e[2][2])
+    )) == {G(e[0][0]), G(e[1][1]), G(e[2][2])}
 
 
 def test_match_components():
@@ -159,31 +162,33 @@ def test_match_components():
     np = [N() for np in range(0, 6)]
     ep = [[E(np1, np2) for np2 in np] for np1 in np]
 
-    assert G(ep[0][1], ep[1][2], ep[2][0]).match(G(
+    assert set(
+        G(ep[0][1], ep[1][2], ep[2][0]
+    ).match(G(
         e[0][1], e[1][2], e[2][0],
         e[3][4], e[4][5], e[5][3]
-    )) == G(
-        e[0][1], e[1][2], e[2][0],
-        e[3][4], e[4][5], e[5][3]
-    )
+    ))) == {
+        G(e[0][1], e[1][2], e[2][0]),
+        G(e[3][4], e[4][5], e[5][3])
+    }
 
-    assert G(
+    assert set(G(
         ep[0][1], ep[1][2], ep[2][0],
         ep[3][4], ep[4][5], ep[5][3]
     ).match(G(
         e[0][1], e[1][2], e[2][0],
         e[3][4], e[4][5], e[5][3]
-    )) == G(
+    ))) == {G(
         e[0][1], e[1][2], e[2][0],
         e[3][4], e[4][5], e[5][3]
-    )
+    )}
 
-    assert G(
+    assert set(G(
         ep[0][1], ep[1][2], ep[2][0],
         ep[3][4], ep[4][5], ep[5][3]
     ).match(G(
         e[0][1], e[1][2], e[2][0]
-    )) is None
+    ))) == set()
 
 
 def test_apply_connect_two_subgraphs():
