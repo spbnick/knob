@@ -4,6 +4,7 @@ KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 
 from typing import Dict, Set, Union, Optional, Tuple
 from functools import reduce
+from copy import copy
 import graphviz  # type: ignore
 
 # Calm down, pylint: disable=too-few-public-methods
@@ -265,9 +266,30 @@ class GraphPattern:
              for np in (self.node_patterns - connected_node_patterns)]
         ) + "}"
 
+    def __eq__(self, other):
+        if not isinstance(other, GraphPattern):
+            return NotImplemented
+        return self.node_patterns == other.node_patterns and \
+            self.edge_patterns == other.edge_patterns;
+
     def __copy__(self):
         return GraphPattern(node_patterns=self.node_patterns,
                             edge_patterns=self.edge_patterns)
+
+    def __or__(self, other):
+        if not isinstance(other, GraphPattern):
+            return NotImplemented
+        return GraphPattern(
+            node_patterns=(self.node_patterns | other.node_patterns),
+            edge_patterns=(self.edge_patterns | other.edge_patterns)
+        )
+
+    def __ior__(self, other):
+        if not isinstance(other, GraphPattern):
+            return NotImplemented
+        self.node_patterns |= other.node_patterns
+        self.edge_patterns |= other.edge_patterns
+        return self
 
 
 class Graph:
@@ -328,6 +350,13 @@ class Graph:
             return NotImplemented
         return Graph(nodes=(self.nodes | other.nodes),
                      edges=(self.edges | other.edges))
+
+    def __ior__(self, other):
+        if not isinstance(other, Graph):
+            return NotImplemented
+        self.nodes |= other.nodes
+        self.edges |= other.edges
+        return self
 
     @classmethod
     def trim(cls, v: Union[str, int]):
@@ -405,6 +434,85 @@ class Graph:
             for edge_pattern in pattern.edge_patterns
             if not edge_pattern.create
         }
+
+        # If not all patterns matched something
+        if not (all(node_patterns_nodes.values()) and \
+           all(edge_patterns_edges.values())):
+            return None
+
+        # A dictionary of node patterns and edge patterns they're sources of
+        node_patterns_sourcing_edge_patterns = {
+            node_pattern: set(
+                edge_pattern
+                for edge_pattern in edge_patterns_edges
+                if edge_pattern.source is node_pattern
+            )
+            for node_pattern in node_patterns_nodes
+        }
+
+        def match_subgraph(matched_pattern: GraphPattern,
+                           matched_graph: Graph,
+                           node_pattern: NodePattern,
+                           node: Node):
+            """
+            Match a graph subpattern (of "pattern") to a subgraph (of "self"),
+            starting from a specific node pattern and node respectively, and
+            following all the edge patterns and edges in their direction.
+
+            A node pattern is considered matched, if it matches a node which
+            has outgoing edges matching all outgoing edge patterns.
+
+            Args:
+                matched_pattern:    The graph pattern containing node and edge
+                                    patterns matched so far. To be updated.
+                matched_graph:      The graph containing nodes and edges
+                                    matched so far. To be updated.
+                node_pattern:       The node pattern to start with.
+                node:               The node to start with.
+            """
+
+            assert isinstance(matched_pattern, GraphPattern)
+            assert isinstance(matched_graph, Graph)
+            assert isinstance(node_pattern, NodePattern)
+            assert isinstance(node, Node)
+            assert node in node_patterns_nodes[node_pattern]
+            matched_pattern.node_patterns.add(node_pattern)
+            matched_graph.nodes.add(node)
+            # For each unmatched outgoing edge pattern
+            for edge_pattern in (
+                node_patterns_sourcing_edge_patterns[node_pattern] -
+                matched_pattern.edge_patterns
+            ):
+                edges_matched = 0
+                # For each unmatched outgoing edge
+                for edge in (edge_patterns_edges[edge_pattern] -
+                             matched_graph.edges):
+                    # ...with the node as the source
+                    if edge.source is node:
+                        # If the target has already matched
+                        # (via another route)
+                        if edge.target in matched_graph.nodes:
+                            edges_matched += 1
+                            matched_pattern.edge_patterns.add(edge_pattern)
+                            matched_graph.edges.add(edge)
+                            continue
+                        matched_subpattern = copy(matched_pattern)
+                        matched_subpattern.edge_patterns.add(edge_pattern)
+                        matched_subgraph = copy(matched_graph)
+                        matched_subgraph.edges.add(edge)
+                        if match_subgraph(matched_subpattern,
+                                          matched_subgraph,
+                                          edge_pattern.target,
+                                          edge.target):
+                            edges_matched += 1
+                            matched_pattern |= matched_subpattern
+                            matched_graph |= matched_subgraph
+                # If at least one edge pattern matches no edges
+                if not edges_matched:
+                    return False
+            return True
+
+
 
         # While there are no nodes/edges to remove
         # Sorry, I don't really know what I'm doing here 🤦
