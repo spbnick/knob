@@ -145,17 +145,9 @@ class Graph:
             edges:      A set of edges to add to the elements,
                         or None for empty set.
         """
-        assert isinstance(elements, tuple)
-        assert all(isinstance(element, (Node, Edge)) for element in elements)
-        assert nodes is None or isinstance(nodes, set) and all(
-            isinstance(node, Node) for node in nodes
-        )
-        assert edges is None or isinstance(edges, set) and all(
-            isinstance(edge, Edge) for edge in edges
-        )
-        self.nodes: Set[Node] = (nodes or set()).copy()
-        self.edges: Set[Edge] = (edges or set()).copy()
-        self.add(*elements)
+        self.nodes: Set[Node] = set()
+        self.edges: Set[Edge] = set()
+        self.add(*elements, nodes=nodes, edges=edges)
 
     def __hash__(self):
         return hash((frozenset(self.nodes), frozenset(self.edges)))
@@ -189,17 +181,34 @@ class Graph:
         self.edges |= other.edges
         return self
 
-    def add(self, *elements: Tuple[Union[Node, Edge]]):
+    def add(self, *elements: Tuple[Union[Node, Edge]],
+            nodes: Optional[Set[Node]] = None,
+            edges: Optional[Set[Edge]] = None):
         """
         Add elements to the graph.
 
         Args:
             elements:   A tuple of graph elements (nodes or edges).
+            nodes:      A set of nodes to add to the elements,
+                        or None for empty set.
+            edges:      A set of edges to add to the elements,
+                        or None for empty set.
 
         Returns:
             The modified graph (self).
         """
+        assert isinstance(elements, tuple)
         assert all(isinstance(element, (Node, Edge)) for element in elements)
+        assert nodes is None or isinstance(nodes, set) and all(
+            isinstance(node, Node) for node in nodes
+        )
+        assert edges is None or isinstance(edges, set) and all(
+            isinstance(edge, Edge) for edge in edges
+        )
+        if nodes:
+            self.nodes |= nodes
+        if edges:
+            self.edges |= edges
         for element in elements:
             if isinstance(element, Node):
                 self.nodes.add(element)
