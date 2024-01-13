@@ -428,13 +428,13 @@ class Graph:
 
         #_print_stack_indented(f"detailed_match{(self, other)}")
         # TODO: Something smarter than this
-        unique_matches = set()
+        matches_set = set()
         for matches in match_subgraphs({}):
-            unique_matches.add(frozenset(matches.items()))
-        for matches in unique_matches:
-            matches = dict(matches)
-            #_print_stack_indented(f"<- {matches}")
-            yield matches
+            frozen_matches = frozenset(matches.items())
+            if not frozen_matches in matches_set:
+                #_print_stack_indented(f"<- {matches}")
+                yield matches
+                matches_set.add(frozen_matches)
 
     def match(self, other: "Graph") -> Generator["Graph", None, None]:
         """
