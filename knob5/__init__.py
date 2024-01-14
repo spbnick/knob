@@ -75,6 +75,9 @@ class Element:
 class Node(Element):
     """A graph's node"""
 
+    def __copy__(self):
+        return Node(**self.attrs)
+
 
 class Edge(Element):
     """A graph's edge"""
@@ -98,6 +101,9 @@ class Edge(Element):
         super().__init__(**attrs)
         self.source = source
         self.target = target
+
+    def __copy__(self):
+        return Edge(self.source, self.target, **self.attrs)
 
     def get_adjacent_node(self, node: Node) -> Node:
         """
