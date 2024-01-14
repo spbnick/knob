@@ -471,3 +471,15 @@ class Graph:
             g = Graph(*matches.values())
             #_print_stack_indented(f"<- {g}")
             yield g
+
+    def matches(self, other: "Graph") -> bool:
+        """
+        Check if this graph, used as a pattern, matches another graph.
+
+        Args:
+            other:  The graph to match this graph against.
+
+        Returns:
+            True if the graph matches the other graph.
+        """
+        return bool(next(self.detailed_match(other), False))
