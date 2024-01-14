@@ -146,10 +146,14 @@ class Graph:
 
         Args:
             elements:   A tuple of graph elements (nodes or edges).
+                        Nodes references by edges in this tuple are also added
+                        to the graph.
             nodes:      A set of nodes to add to the elements,
                         or None for empty set.
             edges:      A set of edges to add to the elements,
                         or None for empty set.
+                        Nodes referenced by these edges must exist in either
+                        "elements" (possibly via edges) or "nodes".
         """
         self.nodes: Set[Node] = set()
         self.edges: Set[Edge] = set()
@@ -195,10 +199,14 @@ class Graph:
 
         Args:
             elements:   A tuple of graph elements (nodes or edges).
+                        Nodes references by edges in this tuple are also added
+                        to the graph.
             nodes:      A set of nodes to add to the elements,
                         or None for empty set.
             edges:      A set of edges to add to the elements,
                         or None for empty set.
+                        Nodes referenced by these edges must exist in either
+                        "elements" (possibly via edges) or "nodes".
 
         Returns:
             The modified graph (self).
