@@ -277,7 +277,6 @@ class Graph:
     def get_incident_edges(self, node: Node) -> Set[Edge]:
         """
         Get edges incident to a node (both incoming and outgoing).
-        The node is assumed to belong to the graph.
 
         Args:
             node:   The node to get the edges for.
@@ -285,7 +284,6 @@ class Graph:
         Returns:
             A set containing edges incident to the node.
         """
-        assert node in self.nodes
         return set(filter(lambda e: node in (e.source, e.target), self.edges))
 
     def detailed_match(self, other: "Graph") -> \
