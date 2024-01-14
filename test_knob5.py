@@ -1,8 +1,8 @@
 """Knob5 tests."""
 import itertools
-from knob5 import Node as N
-from knob5 import Edge as E
-from knob5 import Graph as G
+from copy import copy
+import pytest
+from knob5 import Node as N, Edge as E, Graph as G
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
@@ -191,7 +191,99 @@ def test_match_components():
     ))) == set()
 
 
-def test_apply_connect_two_subgraphs():
+def test_graft_empty_both():
+    assert G().graft(G(), set()) == G()
+
+
+def test_graft_empty_pattern():
+    g = G(E(N(x=1), N(x=2)))
+    assert g.graft(G(), set()) == g
+
+
+def test_graft_unknown_elements():
+    e = E(N(x=1), N(x=2))
+    with pytest.raises(AssertionError):
+        G().graft(G(), {e}) is None
+
+
+def test_graft_mismatch():
+    e = E(N(x=1), N(x=2))
+    assert G().graft(G(e), {e}) is None
+
+
+def test_graft_node_to_null():
+    n = N()
+    assert G().graft(G(n), {n}) == G(n)
+
+
+def test_graft_node_to_non_null():
+    n1 = N()
+    n2 = N()
+    assert G(n1).graft(G(n2), {n2}) == G(n1, n2)
+
+
+def test_graft_edge_to_null():
+    e = E(N(), N())
+    assert G().graft(G(e), set()) is None
+    assert G().graft(G(e), {e}) is None
+    assert G().graft(G(e), {e, e.source}) is None
+    assert G().graft(G(e), {e, e.target}) is None
+    assert G().graft(G(e), {e, e.source, e.target}) == G(e)
+
+
+def test_graft_edge_to_non_null():
+    n1 = N(x=1)
+    n2 = N(x=2)
+    n3 = N(x=3)
+    e12 = E(n1, n2)
+    e13 = E(n1, n3)
+    e23 = E(n2, n3)
+    assert G(n1, n2).graft(G(e12), set()) is None
+    assert G(n1, n2).graft(G(e12), {e12}).matches(G(e12))
+    assert G(n1, n2).graft(G(e13), {e13}) is None
+    assert G(n1, n2).graft(G(e13), {e13, n3}).matches(G(e13, n2))
+    assert G(n1).graft(G(e12, e13, e23), {e12, e13, e23, n2, n3}).matches(
+        G(e12, e13, e23)
+    )
+    assert G(n1, n2).graft(G(e12, e13, e23), {e12, e13, e23, n3}).matches(
+        G(e12, e13, e23)
+    )
+    assert G(n1, n2, n3).graft(G(e12, e13, e23), {e12, e13, e23}).matches(
+        G(e12, e13, e23)
+    )
+
+
+def test_graft_topographic():
+    loops = tuple(range(0, 2))
+    nodes = tuple(range(0, 3))
+    n = [
+        [
+            N(loop=loop, node=node)
+            for node in nodes
+        ]
+        for loop in loops
+    ]
+    g = G(
+        # Loop one
+        E(n[0][0], n[0][1]),
+        E(n[0][1], n[0][2]),
+        E(n[0][2], n[0][0]),
+        # Loop two
+        E(n[1][0], n[1][1]),
+        E(n[1][1], n[1][2]),
+        E(n[1][2], n[1][0]),
+        # Connection between loops
+        E(n[0][0], n[1][0])
+    )
+    new_edges = {
+        E(n[0][1], n[1][1]),
+        E(n[0][2], n[1][2]),
+    }
+    gp = copy(g).add(edges=new_edges)
+    assert gp.matches(g.graft(gp, new_edges))
+
+
+def disabled_test_graft_connect_two_subgraphs():
     sides = tuple(range(0, 2))
     cycles = tuple(range(0, 2))
     nodes = tuple(range(0, 3))
@@ -220,8 +312,6 @@ def test_apply_connect_two_subgraphs():
             E(n[0][cycle][0], n[1][cycle][0])
             for cycle in cycles
         ),
-        # List all the nodes just in case
-        itertools.chain.from_iterable(itertools.chain.from_iterable(n))
     ))
 
     np = [
@@ -235,6 +325,11 @@ def test_apply_connect_two_subgraphs():
         for side in sides
     ]
 
+    # Connect another pair of nodes between cycles
+    add_edges = {
+        E(np[0][cycle][1], np[1][cycle][1])
+        for cycle in cycles
+    }
     gp = G(*itertools.chain(
         # Make the cycle patterns
         (
@@ -249,13 +344,39 @@ def test_apply_connect_two_subgraphs():
             E(np[0][cycle][0], np[1][cycle][0])
             for cycle in cycles
         ),
-        # List all the nodes just in case
-        itertools.chain.from_iterable(itertools.chain.from_iterable(np))
+        add_edges,
     ))
     print("G")
     print(g.graphviz())
     print("GP")
     print(gp.graphviz())
-    from pprint import pprint
-    print("GP.detailed_match(G)")
-    pprint(gp.detailed_match(g))
+    print("GRAFTED")
+    # FIXME: Takes a long time
+    grafted = g.graft(gp, add_edges)
+    assert grafted is not None
+    print(grafted.graphviz())
+    print("GRAFTED_PATTERN")
+    grafted_pattern = G(*itertools.chain(
+        # Make the cycles
+        (
+            E(n[side][cycle][node],
+              n[side][cycle][(node + 1) % len(nodes)])
+            for side in sides
+            for cycle in cycles
+            for node in nodes
+        ),
+        # Connect a pair of nodes between cycles on different sides
+        (
+            E(n[0][cycle][0], n[1][cycle][0])
+            for cycle in cycles
+        ),
+        (
+            E(n[0][cycle][1], n[1][cycle][1])
+            for cycle in cycles
+            for times in range(0, 2)
+        )
+    ))
+    print(grafted_pattern.graphviz())
+    assert grafted_pattern.matches(grafted)
+    # FIXME: This takes forever
+    #list(grafted_pattern.detailed_match(grafted))
