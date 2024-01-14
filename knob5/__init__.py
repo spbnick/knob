@@ -5,6 +5,7 @@ KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 from typing import Final, Generator, Dict, Set, Union, Optional, Tuple
 from functools import reduce
 from itertools import chain
+from copy import copy
 import graphviz  # type: ignore
 import inspect
 
@@ -531,3 +532,54 @@ class Graph:
             True if the graph matches the other graph.
         """
         return bool(next(self.detailed_match(other), False))
+
+    def graft(self, other: "Graph", add: Set[Element]):
+        """
+        Graft another graph onto this one, adding specified elements from the
+        other graph, connecting the nodes matching the rest.
+
+        Args:
+            other:  The graph to graft onto this one.
+                    The elements of this graph, which are not in "add" will be
+                    matched against this graph to find the nodes where the
+                    added elements should be connected.
+            add:    The elements of the drafted graph, which should be added
+                    to this one. All elements must be from the "other" graph.
+
+        Returns:
+            A new graph with the elements grafted onto it,
+            or None if there were no matches.
+        """
+        add_nodes = other.nodes & add
+        add_edges = other.edges & add
+        assert add == add_nodes | add_edges
+
+        add_edges_internal = {
+            add_edge for add_edge in add_edges
+            if {add_edge.source, add_edge.target} <= add_nodes
+        }
+        add_edges_external = add_edges - add_edges_internal
+
+        grafted = None
+        for matches in Graph(
+            nodes=other.nodes - add_nodes,
+            edges=other.edges - add_edges
+        ).detailed_match(self):
+            if grafted is None:
+                grafted = copy(self)
+                grafted.add(nodes=add_nodes,
+                            edges=add_edges_internal)
+            grafted.add(edges={
+                Edge(
+                    source=add_edge.source
+                        if add_edge.source in add_nodes
+                        else matches[add_edge.source],
+                    target=add_edge.target
+                        if add_edge.target in add_nodes
+                        else matches[add_edge.target],
+                    **add_edge.attrs
+                )
+                for add_edge in add_edges_external
+            })
+
+        return grafted
