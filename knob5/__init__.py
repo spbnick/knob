@@ -237,6 +237,48 @@ class Graph:
             self.edges |= edges
         return self
 
+    def remove(self, *elements: Tuple[Union[Node, Edge]],
+               nodes: Optional[Set[Node]] = None,
+               edges: Optional[Set[Edge]] = None):
+        """
+        Remove elements from the graph.
+
+        Args:
+            elements:   A tuple of graph elements (nodes or edges).
+                        Any edges incident to the nodes in this tuple are
+                        also removed from the graph.
+            nodes:      A set of nodes to remove, or None for empty set.
+                        Any edges incident to these nodes must exist in
+                        either "elements" or "edges".
+            edges:      A set of edges to remove, or None for empty set.
+                        Must contain all edges incident to nodes in "nodes".
+
+        Returns:
+            The modified graph (self).
+        """
+        assert isinstance(elements, tuple)
+        assert all(isinstance(element, (Node, Edge)) for element in elements)
+        assert nodes is None or isinstance(nodes, set) and all(
+            isinstance(node, Node) for node in nodes
+        )
+        assert edges is None or isinstance(edges, set) and all(
+            isinstance(edge, Edge) for edge in edges
+        )
+        if nodes is None:
+            nodes = set()
+        if edges is None:
+            edges = set()
+        for element in set(elements):
+            if isinstance(element, Node):
+                edges |= self.get_incident_edges(element)
+                nodes.add(element)
+            elif isinstance(element, Edge):
+                edges.add(element)
+        assert all(self.get_incident_edges(node) <= edges for node in nodes)
+        self.nodes -= nodes
+        self.edges -= edges
+        return self
+
     def graphviz(self) -> str:
         """
         Render the graph into a Graphviz representation.
