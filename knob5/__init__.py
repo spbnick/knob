@@ -533,53 +533,55 @@ class Graph:
         """
         return bool(next(self.detailed_match(other), False))
 
-    def graft(self, other: "Graph", add: Set[Element]):
+    def graft(self, other: "Graph", elements: Set[Element]):
         """
         Graft another graph onto this one, adding specified elements from the
         other graph, connecting the nodes matching the rest.
 
         Args:
-            other:  The graph to graft onto this one.
-                    The elements of this graph, which are not in "add" will be
-                    matched against this graph to find the nodes where the
-                    added elements should be connected.
-            add:    The elements of the drafted graph, which should be added
-                    to this one. All elements must be from the "other" graph.
+            other:      The graph to graft onto this one.
+                        The elements of this graph, which are not in
+                        "elements" will be matched against this graph to find
+                        the nodes where the added elements should be
+                        connected.
+            elements:   The elements of the drafted graph, which should be
+                        added to this one. All elements must be from the
+                        "other" graph.
 
         Returns:
             A new graph with the elements grafted onto it,
             or None if there were no matches.
         """
-        add_nodes = other.nodes & add
-        add_edges = other.edges & add
-        assert add == add_nodes | add_edges
+        nodes = other.nodes & elements
+        edges = other.edges & elements
+        assert elements == nodes | edges
 
-        add_edges_internal = {
-            add_edge for add_edge in add_edges
-            if {add_edge.source, add_edge.target} <= add_nodes
+        edges_internal = {
+            edge for edge in edges
+            if {edge.source, edge.target} <= nodes
         }
-        add_edges_external = add_edges - add_edges_internal
+        edges_external = edges - edges_internal
 
         grafted = None
         for matches in Graph(
-            nodes=other.nodes - add_nodes,
-            edges=other.edges - add_edges
+            nodes=other.nodes - nodes,
+            edges=other.edges - edges
         ).detailed_match(self):
             if grafted is None:
                 grafted = copy(self)
-                grafted.add(nodes=add_nodes,
-                            edges=add_edges_internal)
+                grafted.add(nodes=nodes,
+                            edges=edges_internal)
             grafted.add(edges={
                 Edge(
-                    source=add_edge.source
-                        if add_edge.source in add_nodes
-                        else matches[add_edge.source],
-                    target=add_edge.target
-                        if add_edge.target in add_nodes
-                        else matches[add_edge.target],
-                    **add_edge.attrs
+                    source=edge.source
+                        if edge.source in nodes
+                        else matches[edge.source],
+                    target=edge.target
+                        if edge.target in nodes
+                        else matches[edge.target],
+                    **edge.attrs
                 )
-                for add_edge in add_edges_external
+                for edge in edges_external
             })
 
         return grafted
