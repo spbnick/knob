@@ -192,43 +192,43 @@ def test_match_components():
 
 
 def test_graft_empty_both():
-    assert G().graft(G(), set()) == G()
+    assert G().graft(G()) == G()
 
 
 def test_graft_empty_pattern():
     g = G(E(N(x=1), N(x=2)))
-    assert g.graft(G(), set()) == g
+    assert g.graft(G()) == g
 
 
 def test_graft_unknown_elements():
     e = E(N(x=1), N(x=2))
     with pytest.raises(AssertionError):
-        G().graft(G(), {e}) is None
+        G().graft(G(), e) is None
 
 
 def test_graft_mismatch():
     e = E(N(x=1), N(x=2))
-    assert G().graft(G(e), {e}) is None
+    assert G().graft(G(e), e) is None
 
 
 def test_graft_node_to_null():
     n = N()
-    assert G().graft(G(n), {n}) == G(n)
+    assert G().graft(G(n), n) == G(n)
 
 
 def test_graft_node_to_non_null():
     n1 = N()
     n2 = N()
-    assert G(n1).graft(G(n2), {n2}) == G(n1, n2)
+    assert G(n1).graft(G(n2), n2) == G(n1, n2)
 
 
 def test_graft_edge_to_null():
     e = E(N(), N())
-    assert G().graft(G(e), set()) is None
-    assert G().graft(G(e), {e}) is None
-    assert G().graft(G(e), {e, e.source}) is None
-    assert G().graft(G(e), {e, e.target}) is None
-    assert G().graft(G(e), {e, e.source, e.target}) == G(e)
+    assert G().graft(G(e)) is None
+    assert G().graft(G(e), e) is None
+    assert G().graft(G(e), e, e.source) is None
+    assert G().graft(G(e), e, e.target) is None
+    assert G().graft(G(e), e, e.source, e.target) == G(e)
 
 
 def test_graft_edge_to_non_null():
@@ -238,17 +238,17 @@ def test_graft_edge_to_non_null():
     e12 = E(n1, n2)
     e13 = E(n1, n3)
     e23 = E(n2, n3)
-    assert G(n1, n2).graft(G(e12), set()) is None
-    assert G(n1, n2).graft(G(e12), {e12}).matches(G(e12))
-    assert G(n1, n2).graft(G(e13), {e13}) is None
-    assert G(n1, n2).graft(G(e13), {e13, n3}).matches(G(e13, n2))
-    assert G(n1).graft(G(e12, e13, e23), {e12, e13, e23, n2, n3}).matches(
+    assert G(n1, n2).graft(G(e12)) is None
+    assert G(n1, n2).graft(G(e12), e12).matches(G(e12))
+    assert G(n1, n2).graft(G(e13), e13) is None
+    assert G(n1, n2).graft(G(e13), e13, n3).matches(G(e13, n2))
+    assert G(n1).graft(G(e12, e13, e23), e12, e13, e23, n2, n3).matches(
         G(e12, e13, e23)
     )
-    assert G(n1, n2).graft(G(e12, e13, e23), {e12, e13, e23, n3}).matches(
+    assert G(n1, n2).graft(G(e12, e13, e23), e12, e13, e23, n3).matches(
         G(e12, e13, e23)
     )
-    assert G(n1, n2, n3).graft(G(e12, e13, e23), {e12, e13, e23}).matches(
+    assert G(n1, n2, n3).graft(G(e12, e13, e23), e12, e13, e23).matches(
         G(e12, e13, e23)
     )
 
@@ -280,7 +280,7 @@ def test_graft_topographic():
         E(n[0][2], n[1][2]),
     }
     gp = copy(g).add(edges=new_edges)
-    assert gp.matches(g.graft(gp, new_edges))
+    assert gp.matches(g.graft(gp, *new_edges))
 
 
 def disabled_test_graft_connect_two_subgraphs():
@@ -352,7 +352,7 @@ def disabled_test_graft_connect_two_subgraphs():
     print(gp.graphviz())
     print("GRAFTED")
     # FIXME: Takes a long time
-    grafted = g.graft(gp, add_edges)
+    grafted = g.graft(gp, *add_edges)
     assert grafted is not None
     print(grafted.graphviz())
     print("GRAFTED_PATTERN")

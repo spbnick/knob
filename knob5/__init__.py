@@ -533,7 +533,7 @@ class Graph:
         """
         return bool(next(self.detailed_match(other), False))
 
-    def graft(self, other: "Graph", elements: Set[Element]):
+    def graft(self, other: "Graph", *elements: Tuple[Element]):
         """
         Graft another graph onto this one, adding specified elements from the
         other graph, connecting the nodes matching the rest.
@@ -552,6 +552,7 @@ class Graph:
             A new graph with the elements grafted onto it,
             or None if there were no matches.
         """
+        elements = set(elements)
         nodes = other.nodes & elements
         edges = other.edges & elements
         assert elements == nodes | edges
