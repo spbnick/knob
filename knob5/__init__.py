@@ -211,10 +211,6 @@ class Graph:
         assert edges is None or isinstance(edges, set) and all(
             isinstance(edge, Edge) for edge in edges
         )
-        if nodes:
-            self.nodes |= nodes
-        if edges:
-            self.edges |= edges
         for element in elements:
             if isinstance(element, Node):
                 self.nodes.add(element)
@@ -222,6 +218,15 @@ class Graph:
                 self.edges.add(element)
                 self.nodes.add(element.source)
                 self.nodes.add(element.target)
+        if nodes:
+            self.nodes |= nodes
+        if edges:
+            assert all(
+                edge.source in self.nodes and
+                edge.target in self.nodes
+                for edge in edges
+            )
+            self.edges |= edges
         return self
 
     def graphviz(self) -> str:
