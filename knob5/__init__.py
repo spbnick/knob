@@ -81,7 +81,7 @@ class Node(Element):
 
 
 class Edge(Element):
-    """A graph's edge"""
+    """A directed graph's edge"""
 
     def __init__(self, source: Node, target: Node, **attrs: Union[str, int]):
         """
@@ -137,7 +137,7 @@ class Edge(Element):
 
 
 class Graph:
-    """A graph"""
+    """A directed graph"""
 
     def __init__(self, *elements: Tuple[Union[Node, Edge]],
                  nodes: Optional[Set[Node]] = None,
