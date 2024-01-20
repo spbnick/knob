@@ -563,16 +563,14 @@ class Graph:
         }
         edges_external = edges - edges_internal
 
-        grafted = None
+        edges_to_add = None
         for matches in Graph(
             nodes=other.nodes - nodes,
             edges=other.edges - edges
         ).detailed_match(self):
-            if grafted is None:
-                grafted = copy(self)
-                grafted.add(nodes=nodes,
-                            edges=edges_internal)
-            grafted.add(edges={
+            if edges_to_add is None:
+                edges_to_add = edges_internal
+            edges_to_add |= {
                 Edge(
                     source=edge.source
                         if edge.source in nodes
@@ -583,9 +581,10 @@ class Graph:
                     **edge.attrs
                 )
                 for edge in edges_external
-            })
+            }
 
-        return grafted
+        return None if edges_to_add is None \
+            else copy(self).add(nodes=nodes, edges=edges_to_add)
 
     def prune(self, other: "Graph", *elements: Tuple[Element]):
         """
