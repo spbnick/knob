@@ -586,3 +586,32 @@ class Graph:
             })
 
         return grafted
+
+    def prune(self, other: "Graph", *elements: Tuple[Element]):
+        """
+        Prune another graph from this one by matching, and removing the
+        elements matching the specified ones.
+
+        Args:
+            other:      The graph to prune from this one.
+                        It will be matched against this graph, and then
+                        elements matching the ones in "elements" will be
+                        removed.
+            elements:   The elements of the "other" graph, which should match
+                        the elements to be removed from this one. All elements
+                        must be from the "other" graph.
+
+        Returns:
+            A new graph with the elements pruned from it,
+            or None if there were no matches.
+        """
+        elements = set(elements)
+        assert elements <= (other.nodes | other.edges)
+        pruned = None
+        for matches in other.detailed_match(self):
+            if pruned is None:
+                pruned = copy(self)
+            pruned.remove(*(
+                matches[element] for element in elements
+            ))
+        return pruned

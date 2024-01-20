@@ -380,3 +380,23 @@ def disabled_test_graft_connect_two_subgraphs():
     assert grafted_pattern.matches(grafted)
     # FIXME: This takes forever
     #list(grafted_pattern.detailed_match(grafted))
+
+
+def test_prune_empty_both():
+    assert G().prune(G()) == G()
+
+
+def test_prune_empty_pattern():
+    g = G(E(N(x=1), N(x=2)))
+    assert g.prune(G()) == g
+
+
+def test_prune_unknown_elements():
+    e = E(N(x=1), N(x=2))
+    with pytest.raises(AssertionError):
+        G().graft(G(), e) is None
+
+
+def test_prune_mismatch():
+    e = E(N(x=1), N(x=2))
+    assert G().prune(G(e), e) is None
