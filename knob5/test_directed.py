@@ -1,8 +1,8 @@
-"""Knob5 tests."""
+"""Knob5 directed graph tests."""
 import itertools
 from copy import copy
 import pytest
-from knob5 import Node as N, Edge as E, Graph as G
+from knob5.directed import Node as N, Edge as E, Graph as G
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring

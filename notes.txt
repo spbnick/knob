@@ -1633,3 +1633,25 @@ for each subgraph match:
     create the half-new edges
 if there were no matches:
     discard
+---
+OK, we got the basic graph grafting/pruning working, let's try to marry it to
+knowledge graphs and the expressions for constructing them seen in knob2.
+
+What do we want?
+
+We want to be able to modify a graph using expressions which we developed in
+knob2. Either in a seamless manner without explicit commit, or e.g. with a
+context manager.
+
+The problem with using the context manager, is that you cannot reference nodes
+created by the context manager inside the context itself. So the code would
+need to look split arbitrarily along the reference boundaries.
+
+Actually, with careful use of a reference operator (e.g. '~'), it could be
+possible to manage relatively sensible contexts.
+
+However, if we're going to just use references, then the whole idea of
+enabling contexts reduces in power.
+
+So, let's try to go without context managers, and proceed with actualization
+on every operator's evaluation.
