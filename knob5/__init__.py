@@ -2,4 +2,4 @@
 KNOB - Knowledge builder - a module for creating knowledge (hyper)graphs.
 """
 
-from knob5 import directed
+from knob5 import directed  # noqa: F401

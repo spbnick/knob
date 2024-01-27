@@ -2,15 +2,14 @@
 KNOB - Knowledge builder - directed graph
 """
 
-from typing import Final, Generator, Dict, Set, Union, Optional, Tuple
-from functools import reduce
-from itertools import chain
+from typing import cast, Final, Generator, Dict, Set, Union, Optional
 from copy import copy
-import graphviz  # type: ignore
 import inspect
+import graphviz  # type: ignore
 
 # Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal
+# We need them, pylint: disable=fixme
 
 # Next ID to assign to a created element
 ELEMENT_ID_NEXT = 1
@@ -22,6 +21,7 @@ ELEMENT_ID_MAP = {}
 def _print_stack_indented(*args, **kwargs):
     indent = '    ' * (len(inspect.stack()) - 1)
     print(indent[:-1], *args, **kwargs)
+
 
 class Element:
     """A graph's element (node/edge)"""
@@ -139,7 +139,7 @@ class Edge(Element):
 class Graph:
     """A directed graph"""
 
-    def __init__(self, *elements: Tuple[Union[Node, Edge]],
+    def __init__(self, *elements: Union[Node, Edge],
                  nodes: Optional[Set[Node]] = None,
                  edges: Optional[Set[Edge]] = None):
         """
@@ -192,7 +192,7 @@ class Graph:
         self.edges |= other.edges
         return self
 
-    def add(self, *elements: Tuple[Union[Node, Edge]],
+    def add(self, *elements: Union[Node, Edge],
             nodes: Optional[Set[Node]] = None,
             edges: Optional[Set[Edge]] = None):
         """
@@ -238,7 +238,7 @@ class Graph:
             self.edges |= edges
         return self
 
-    def remove(self, *elements: Tuple[Union[Node, Edge]],
+    def remove(self, *elements: Union[Node, Edge],
                nodes: Optional[Set[Node]] = None,
                edges: Optional[Set[Edge]] = None):
         """
@@ -293,7 +293,11 @@ class Graph:
 
         def quote(v: Union[str, int]):
             """Quote a value, if necessary"""
-            return str(v) if isinstance(v, int) or v.isidentifier() else repr(v)
+            return (
+                str(v)
+                if isinstance(v, int) or v.isidentifier()
+                else repr(v)
+            )
 
         def format_label(element: Element):
             """Format a label for a graphviz element"""
@@ -329,8 +333,9 @@ class Graph:
         """
         return set(filter(lambda e: node in (e.source, e.target), self.edges))
 
-    def detailed_match(self, other: "Graph") -> \
-            Generator[Dict[Element, Element], None, None]:
+    def detailed_match(self, other: "Graph") -> Generator[
+        Dict[Union[Node, Edge], Union[Node, Edge]], None, None
+    ]:
         """
         Find all matches of this graph, as a pattern, against another graph.
 
@@ -342,9 +347,13 @@ class Graph:
             and the matched element of the other graph, whenever this graph
             matches completely.
         """
-        def match_components(matches: Dict[Element, Element],
-                             self_node: Node, other_node: Node) -> \
-                Generator[Dict[Element, Element], None, None]:
+        def match_components(
+            matches: Dict[Union[Node, Edge], Union[Node, Edge]],
+            self_node: Node,
+            other_node: Node
+        ) -> Generator[
+            Dict[Union[Node, Edge], Union[Node, Edge]], None, None
+        ]:
             """
             Find all subgraphs of a component of the other graph fully
             matching a component of this graph, used as a pattern.
@@ -387,14 +396,14 @@ class Graph:
             )
             assert matches.get(self_node) is other_node
 
-            #_print_stack_indented(f"match_components"
-            #                      f"{(matches, self_node, other_node)}")
+            # _print_stack_indented(f"match_components"
+            #                       f"{(matches, self_node, other_node)}")
 
             rem_self_edges = self.get_incident_edges(self_node) - self_matches
 
             # If there are no edges left to match
             if not rem_self_edges:
-                #_print_stack_indented(f"<- {matches}")
+                # _print_stack_indented(f"<- {matches}")
                 yield matches
                 return
 
@@ -444,8 +453,11 @@ class Graph:
                             new_matches, self_node, other_node
                         )
 
-        def match_subgraphs(matches: Dict[Element, Element]) -> \
-                Generator[Dict[Element, Element], None, None]:
+        def match_subgraphs(
+            matches: Dict[Union[Node, Edge], Union[Node, Edge]]
+        ) -> Generator[
+            Dict[Union[Node, Edge], Union[Node, Edge]], None, None
+        ]:
             """
             Match this graph, used as a pattern, to subgraphs in the other.
 
@@ -475,9 +487,9 @@ class Graph:
                 for o in other_matches if isinstance(o, Edge)
             )
 
-            #_print_stack_indented(f"match_subgraphs({matches})")
+            # _print_stack_indented(f"match_subgraphs({matches})")
             if self_matches == (self.nodes | self.edges):
-                #_print_stack_indented(f"<- {matches}")
+                # _print_stack_indented(f"<- {matches}")
                 yield matches
                 return
             rem_self_nodes = self.nodes - self_matches
@@ -495,13 +507,13 @@ class Graph:
                         # Match the remaining components
                         yield from match_subgraphs(new_matches)
 
-        #_print_stack_indented(f"detailed_match{(self, other)}")
+        # _print_stack_indented(f"detailed_match{(self, other)}")
         # TODO: Something smarter than this
         matches_set = set()
         for matches in match_subgraphs({}):
             frozen_matches = frozenset(matches.items())
-            if not frozen_matches in matches_set:
-                #_print_stack_indented(f"<- {matches}")
+            if frozen_matches not in matches_set:
+                # _print_stack_indented(f"<- {matches}")
                 yield matches
                 matches_set.add(frozen_matches)
 
@@ -515,10 +527,10 @@ class Graph:
         Yields:
             Subgraphs of the other graph that match this graph.
         """
-        #_print_stack_indented(f"match{(self, other)}")
+        # _print_stack_indented(f"match{(self, other)}")
         for matches in self.detailed_match(other):
             g = Graph(*matches.values())
-            #_print_stack_indented(f"<- {g}")
+            # _print_stack_indented(f"<- {g}")
             yield g
 
     def matches(self, other: "Graph") -> bool:
@@ -533,7 +545,7 @@ class Graph:
         """
         return bool(next(self.detailed_match(other), False))
 
-    def graft(self, other: "Graph", *elements: Tuple[Element]):
+    def graft(self, other: "Graph", *elements: Union[Node, Edge]):
         """
         Graft another graph onto this one, adding specified elements from the
         other graph, connecting the nodes matching the rest.
@@ -552,10 +564,10 @@ class Graph:
             A new graph with the elements grafted onto it,
             or None if there were no matches.
         """
-        elements = set(elements)
-        nodes = other.nodes & elements
-        edges = other.edges & elements
-        assert elements == nodes | edges
+        element_set = set(elements)
+        nodes = other.nodes & element_set
+        edges = other.edges & element_set
+        assert element_set == nodes | edges
 
         edges_internal = {
             edge for edge in edges
@@ -573,11 +585,11 @@ class Graph:
             edges_to_add |= {
                 Edge(
                     source=edge.source
-                        if edge.source in nodes
-                        else matches[edge.source],
+                    if edge.source in nodes
+                    else cast(Node, matches[edge.source]),
                     target=edge.target
-                        if edge.target in nodes
-                        else matches[edge.target],
+                    if edge.target in nodes
+                    else cast(Node, matches[edge.target]),
                     **edge.attrs
                 )
                 for edge in edges_external
@@ -586,7 +598,7 @@ class Graph:
         return None if edges_to_add is None \
             else copy(self).add(nodes=nodes, edges=edges_to_add)
 
-    def prune(self, other: "Graph", *elements: Tuple[Element]):
+    def prune(self, other: "Graph", *elements: Union[Node, Edge]):
         """
         Prune another graph from this one by matching, and removing the
         elements matching the specified ones.
@@ -604,13 +616,13 @@ class Graph:
             A new graph with the elements pruned from it,
             or None if there were no matches.
         """
-        elements = set(elements)
-        assert elements <= (other.nodes | other.edges)
+        element_set = set(elements)
+        assert element_set <= (other.nodes | other.edges)
         pruned = None
         for matches in other.detailed_match(self):
             if pruned is None:
                 pruned = copy(self)
             pruned.remove(*(
-                matches[element] for element in elements
+                matches[element] for element in element_set
             ))
         return pruned

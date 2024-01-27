@@ -6,6 +6,7 @@ from knob5.directed import Node as N, Edge as E, Graph as G
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
+# We need them, pylint: disable=fixme
 
 
 def test_match_empty_both():
@@ -48,8 +49,8 @@ def test_match_two_nodes():
     n2 = N(n=2)
     assert set(G(N(n=1)).match(G(n1_a, n2))) == {G(n1_a)}
     assert set(G(N(n=1)).match(G(n1_b, n2))) == {G(n1_b)}
-    assert set(G(N(n=1)).match(G(n1_a, n1_b))) == {G(n1_a),G(n1_b)}
-    assert set(G(N()).match(G(n1_a, n1_b))) == {G(n1_a),G( n1_b)}
+    assert set(G(N(n=1)).match(G(n1_a, n1_b))) == {G(n1_a), G(n1_b)}
+    assert set(G(N()).match(G(n1_a, n1_b))) == {G(n1_a), G(n1_b)}
     assert set(G(N()).match(G(n1, n2))) == {G(n1), G(n2)}
     assert set(G(N(n=1), N(n=2)).match(G(n1, n2))) == {G(n1, n2)}
     assert set(G(N(n=1), N(n=3)).match(G(n1, n2))) == set()
@@ -162,8 +163,8 @@ def test_match_components():
     np = [N() for np in range(0, 6)]
     ep = [[E(np1, np2) for np2 in np] for np1 in np]
 
-    assert set(
-        G(ep[0][1], ep[1][2], ep[2][0]
+    assert set(G(
+        ep[0][1], ep[1][2], ep[2][0]
     ).match(G(
         e[0][1], e[1][2], e[2][0],
         e[3][4], e[4][5], e[5][3]
@@ -203,7 +204,7 @@ def test_graft_empty_pattern():
 def test_graft_unknown_elements():
     e = E(N(x=1), N(x=2))
     with pytest.raises(AssertionError):
-        G().graft(G(), e) is None
+        G().graft(G(), e)
 
 
 def test_graft_mismatch():
@@ -379,7 +380,7 @@ def disabled_test_graft_connect_two_subgraphs():
     print(grafted_pattern.graphviz())
     assert grafted_pattern.matches(grafted)
     # FIXME: This takes forever
-    #list(grafted_pattern.detailed_match(grafted))
+    # list(grafted_pattern.detailed_match(grafted))
 
 
 def test_prune_empty_both():
@@ -394,7 +395,7 @@ def test_prune_empty_pattern():
 def test_prune_unknown_elements():
     e = E(N(x=1), N(x=2))
     with pytest.raises(AssertionError):
-        G().graft(G(), e) is None
+        G().graft(G(), e)
 
 
 def test_prune_mismatch():
