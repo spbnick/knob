@@ -33,19 +33,19 @@ class Graph:
 
     @property
     def e(self):
-        """An alias for unique entity"""
+        """An alias for 'entity'"""
         return self.entity
 
     @property
     def relation(self):
-        """A unique relation"""
+        """A graph pattern matching a unique relation"""
         rp = RelationPattern(self.next_relation_id << 1 | 1, {}, {})
         self.next_relation_id += 1
         return GraphPattern(self, {rp: False}, rp, rp)
 
     @property
     def r(self):
-        """An alias for unique relation"""
+        """An alias for 'relation'"""
         return self.relation
 
 
