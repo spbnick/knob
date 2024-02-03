@@ -187,7 +187,7 @@ def test_refs():
 
     g = KG()
     assert repr((x := g.e.x) >> x.y) == \
-        'e0 < e0.x, r0:(source=e0, target=e0) > e0'
+        'e0 < e0.x.y, r0:(source=e0, target=e0) > e0'
     x = None
 
     g = KG()
@@ -201,19 +201,33 @@ def test_refs():
     x = None
 
     g = KG()
-    assert repr((expr := g.e.x >> g.e.y) >> expr) == (
+    assert repr((x := g.e.x >> g.e.y) >> x) == (
         'e0 < '
         'e0.x, e1.y, r0:(source=e0, target=e1), r1:(source=e1, target=e0) '
         '> e1'
     )
-    expr = None
+    x = None
 
     g = KG()
-    print(((x := g.e.x(attr1=10)) >> g.e.y >> x(attr2=20))._eval())
-    assert False
+    assert repr((x := g.e.x(attr1=10)) >> g.e.y >> x(attr2=20)) == (
+        'e0 < '
+        'e1.y, '
+        'r0:(source=e0, target=e1), '
+        'e0.x(attr1=10, attr2=20), '
+        'r1:(source=e1, target=e0) '
+        '> e0'
+    )
+    x = None
 
     g = KG()
-    assert repr((x := g.e.x(attr1=10)) >> g.e.y >> x(attr2=20)) == ""
+    assert repr((x := g.e.x(attr1=10)) >> g.e.y >> x(attr1=20)) == (
+        'e0 < '
+        'e1.y, '
+        'r0:(source=e0, target=e1), '
+        'e0.x(attr1=20), '
+        'r1:(source=e1, target=e0) '
+        '> e0'
+    )
     x = None
 
 
@@ -226,9 +240,9 @@ def test_complex(g):
         g.r.ll_state_transition >> a
     ) == (
         "e0 < "
-        "e0.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
         "e1.ll_state.Standby(comment='No transmit/receive'), "
         "r0.ll_state_transition:(source=e0, target=e1), "
+        "e0.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
         "r1.ll_state_transition:(source=e1, target=e0) "
         "> e0"
     )

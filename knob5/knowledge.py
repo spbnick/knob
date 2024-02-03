@@ -157,6 +157,10 @@ class ElementPattern(AtomPattern):
         return result
 
     @abstractmethod
+    def __or__(self, other) -> 'ElementPattern':
+        """Merge two instances of the element pattern together"""
+
+    @abstractmethod
     def with_updated_attrs(self, attrs: dict[str, Union[str, int]]) -> \
             Tuple['ElementPattern', 'ElementPattern']:
         """Duplicate the pattern with attributes updated"""
@@ -175,6 +179,16 @@ class EntityPattern(ElementPattern):
             Tuple['EntityPattern', 'EntityPattern']:
         """Duplicate the pattern with attributes updated"""
         return self, EntityPattern(self.id, self.attrs | attrs)
+
+    def __or__(self, other) -> 'EntityPattern':
+        """Merge two instances of the entity pattern together"""
+        if other is self:
+            return self
+        if not isinstance(other, EntityPattern):
+            return NotImplemented
+        if other.id != self.id:
+            raise ValueError
+        return EntityPattern(self.id, self.attrs | other.attrs)
 
 
 class RelationPattern(ElementPattern):
@@ -213,6 +227,17 @@ class RelationPattern(ElementPattern):
         """Duplicate the pattern with roles updated"""
         return self, \
             RelationPattern(self.id, self.attrs, self.roles | roles)
+
+    def __or__(self, other) -> 'RelationPattern':
+        """Merge two instances of the relation pattern together"""
+        if other is self:
+            return self
+        if not isinstance(other, RelationPattern):
+            return NotImplemented
+        if other.id != self.id:
+            raise ValueError
+        return RelationPattern(self.id, self.attrs | other.attrs,
+                               self.roles | other.roles)
 
 
 class RolePattern(AtomPattern):
@@ -437,19 +462,39 @@ class GraphPattern:
             update_boundary(self.left, old, new),
             update_boundary(self.right, old, new),
         )
-        print(f"{self} . with_replaced_atom({old}, {new}) -> {gp}")
+        # print(f"{self} . with_replaced_atom({old}, {new}) -> {gp}")
         return gp
 
     def __or__(self, other) -> 'GraphPattern':
         """Merge two graph patterns"""
-        if isinstance(other, GraphPattern) and other.graph is self.graph:
-            elements = self.elements.copy()
-            for element, create in other.elements.items():
-                if element in elements:
-                    create = max(elements[element], create)
-                elements[element] = create
-            return GraphPattern(self.graph, elements, self.left, other.right)
-        return NotImplemented
+        if not isinstance(other, GraphPattern):
+            return NotImplemented
+        if other.graph is not self.graph:
+            raise ValueError
+
+        elements = self.elements.copy()
+        id_elements = {e.id: e for e in elements}
+        for element, create in other.elements.items():
+            if element.id in id_elements:
+                element = id_elements[element.id] | element
+            id_elements[element.id] = element
+            elements[element] = elements.pop(element, False) | create
+
+        def update_boundary(boundary):
+            if isinstance(boundary, AttachedRolePattern):
+                return boundary.with_replaced_element(
+                    id_elements[boundary.element.id]
+                )
+            elif isinstance(boundary, ElementPattern):
+                return id_elements[boundary.id]
+            return boundary
+
+        return GraphPattern(
+            self.graph,
+            elements,
+            update_boundary(self.left),
+            update_boundary(other.right)
+        )
 
     def __pos__(self):
         """Enable creation of all elements in the graph pattern"""
