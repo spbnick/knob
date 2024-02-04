@@ -197,7 +197,12 @@ def test_refs():
 
     g = KG()
     assert repr((x := +g.e.x) >> -x) == \
-        'e0 < +e0.x, r0:(source=e0, target=e0) > e0'
+        'e0 < e0.x, r0:(source=e0, target=e0) > e0'
+    x = None
+
+    g = KG()
+    assert repr(+(x := g.e.x) >> x) == \
+        'e0 < e0.x, r0:(source=e0, target=e0) > e0'
     x = None
 
     g = KG()

@@ -478,7 +478,8 @@ class GraphPattern:
             if element.id in id_elements:
                 element = id_elements[element.id] | element
             id_elements[element.id] = element
-            elements[element] = elements.pop(element, False) | create
+            elements.pop(element, None)
+            elements[element] = create
 
         def update_boundary(boundary):
             if isinstance(boundary, AttachedRolePattern):
