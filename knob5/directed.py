@@ -11,12 +11,6 @@ import graphviz  # type: ignore
 # NO, pylint: disable=use-dict-literal
 # We need them, pylint: disable=fixme
 
-# Next ID to assign to a created element
-ELEMENT_ID_NEXT = 1
-
-# A dictionary of created element object IDs and their sequential IDs
-ELEMENT_ID_MAP = {}
-
 
 def _print_stack_indented(*args, **kwargs):
     indent = '    ' * (len(inspect.stack()) - 1)
@@ -25,6 +19,9 @@ def _print_stack_indented(*args, **kwargs):
 
 class Element:
     """A graph's element (node/edge)"""
+
+    # The next ID to assign to a created element
+    __NEXT_ID = 0
 
     def __init__(self, **attrs: Union[str, int]):
         """
@@ -39,17 +36,14 @@ class Element:
             for n, v in attrs.items()
         )
         self.attrs = attrs.copy()
-        # Oh, really, pylint: disable=global-statement
-        global ELEMENT_ID_NEXT
-        # Avoid actual reference to the element
-        ELEMENT_ID_MAP[id(self)] = ELEMENT_ID_NEXT
-        ELEMENT_ID_NEXT += 1
+        self.id = Element.__NEXT_ID
+        Element.__NEXT_ID += 1
 
     def __hash__(self):
         return id(self)
 
     def __repr__(self):
-        repr_str = str(ELEMENT_ID_MAP[id(self)])
+        repr_str = str(self.id)
         if self.attrs:
             repr_str += "(" + ", ".join(
                 (k if k.isidentifier() else repr(k)) + "=" + repr(v)
@@ -302,7 +296,7 @@ class Graph:
         def format_label(element: Element):
             """Format a label for a graphviz element"""
             return "\n".join(
-                [str(ELEMENT_ID_MAP[id(element)])] +
+                [str(element.id)] +
                 [f"{quote(n)}={quote(trim(v))}"
                  for n, v in element.attrs.items()]
             )
