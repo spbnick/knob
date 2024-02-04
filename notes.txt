@@ -1655,3 +1655,29 @@ enabling contexts reduces in power.
 
 So, let's try to go without context managers, and proceed with actualization
 on every operator's evaluation.
+---
+OK, that (actualization on every pattern operation) won't work, because even
+though we can just apply every operation with matching pattern, we cannot
+allow mismatching interim patterns, because we can't know when to raise an
+exception on mismatch. And requiring every step of pattern construction to
+match *something* might be too cumbersome. Even though most operations will be
+*restricting* the match, not expanding it, it's possible to expand it (by i.e.
+replacing an attribute's value) simply due to the way your code is structured
+for convenience.
+
+We can explore this later, but for now let's go with explicit pattern
+application. And let's rename "creation" to "mark" (?) E.g.:
+
+    # Add the complete pattern unconditionally, regardless of the marks
+    KG += e(x=1) >> +e(x=2)
+
+    # Match and remove the complete pattern, regardless of the marks
+    KG -= e(x=1) >> +e(x=2)
+
+    # Match unmarked and add marked parts of the pattern
+    KG |= e(x=1) >> +e(x=2)
+
+    # Match the complete pattern and remove the marked parts
+    KG ^= e(x=1) >> +e(x=2)
+
+

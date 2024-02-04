@@ -43,7 +43,7 @@ def test_element(e0, r0):
     assert repr(r0) == "r0 < r0 > r0"
 
 
-def test_element_set_creation(e0, r0):
+def test_element_mark(e0, r0):
     assert repr(+e0) == "e0 < +e0 > e0"
     assert repr(-e0) == "e0 < e0 > e0"
 
@@ -59,7 +59,7 @@ def test_element_update(e0, r0):
     assert repr(r0(**{'foo bar': 'baz'})) == "r0 < r0{'foo bar': 'baz'} > r0"
 
 
-def test_element_update_set_creation(e0, r0):
+def test_element_update_mark(e0, r0):
     assert repr(+e0(x=1)) == "e0 < +e0(x=1) > e0"
     assert repr(-e0(x=1)) == "e0 < e0(x=1) > e0"
 
@@ -80,14 +80,14 @@ def test_element_getitem(e0, r0):
     assert repr(r0['foo bar']) == "r0 < r0['foo bar'] > r0"
 
 
-def test_element_getattr_set_creation(e0, r0):
+def test_element_getattr_mark(e0, r0):
     assert repr(+e0.state) == "e0 < +e0.state > e0"
     assert repr(-e0.state) == "e0 < e0.state > e0"
     assert repr(+r0.state) == "r0 < +r0.state > r0"
     assert repr(-r0.state) == "r0 < r0.state > r0"
 
 
-def test_element_getitem_set_creation(e0, r0):
+def test_element_getitem_mark(e0, r0):
     assert repr(+e0['foo bar']) == "e0 < +e0['foo bar'] > e0"
     assert repr(-e0['foo bar']) == "e0 < e0['foo bar'] > e0"
     assert repr(+r0['foo bar']) == "r0 < +r0['foo bar'] > r0"

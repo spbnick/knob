@@ -364,10 +364,7 @@ class GraphPattern:
             graph:      The supergraph of the graph this pattern is matching.
             elements:   A dictionary of patterns matching elements
                         (entities or relations) belonging to the subgraph, and
-                        one of the two values:
-                        * False, if the element pattern should be matched.
-                        * True, if all elements matching the (enumerable)
-                          pattern should be created unconditionally.
+                        the mark boolean.
                         Roles in any relation patterns contained in this
                         dictionary can only reference element patterns from
                         the same dictionary.
@@ -474,12 +471,12 @@ class GraphPattern:
 
         elements = self.elements.copy()
         id_elements = {e.id: e for e in elements}
-        for element, create in other.elements.items():
+        for element, mark in other.elements.items():
             if element.id in id_elements:
                 element = id_elements[element.id] | element
             id_elements[element.id] = element
             elements.pop(element, None)
-            elements[element] = create
+            elements[element] = mark
 
         def update_boundary(boundary):
             if isinstance(boundary, AttachedRolePattern):
@@ -498,7 +495,7 @@ class GraphPattern:
         )
 
     def __pos__(self):
-        """Enable creation of all elements in the graph pattern"""
+        """Mark all elements in the graph pattern"""
         return GraphPattern(
             self.graph,
             {element: True for element in self.elements},
@@ -507,7 +504,7 @@ class GraphPattern:
         )
 
     def __neg__(self):
-        """Disable creation of all elements in the graph pattern"""
+        """Unmark all elements in the graph pattern"""
         return GraphPattern(
             self.graph,
             {element: False for element in self.elements},
