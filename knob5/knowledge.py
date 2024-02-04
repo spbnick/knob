@@ -369,8 +369,8 @@ class GraphPattern:
                         * True, if all elements matching the (enumerable)
                           pattern should be created unconditionally.
                         Roles in any relation patterns contained in this
-                        dictionary can only reference entity patterns from the
-                        same dictionary.
+                        dictionary can only reference element patterns from
+                        the same dictionary.
             left:       The left-side atom pattern to use when using the
                         graph pattern on the right side of an operator.
                         Must be, or refer to, an element in "elements".
