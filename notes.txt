@@ -1680,4 +1680,6 @@ application. And let's rename "creation" to "mark" (?) E.g.:
     # Match the complete pattern and remove the marked parts
     KG ^= e(x=1) >> +e(x=2)
 
-
+---
+TODO: Decide and implement a consistent approach WRT making a new instance
+      with the result or updating this instance. Likely support both.

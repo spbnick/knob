@@ -1,6 +1,6 @@
 """Knob5 knowledge graph tests."""
 import pytest
-from knob5.knowledge import Graph as KG
+from knob5.knowledge import EntityGraphPattern as E, RelationGraphPattern as R
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
@@ -9,245 +9,231 @@ from knob5.knowledge import Graph as KG
 
 
 @pytest.fixture
-def g():
-    """A graph"""
-    return KG()
-
-
-@pytest.fixture
-def e0(g):
+def e1():
     """The first graph's entity atom operand"""
-    return g.entity
+    return E()
 
 
 @pytest.fixture
-def e1(g):
+def e2():
     """The second graph's entity atom operand"""
-    return g.entity
+    return E()
 
 
 @pytest.fixture
-def r0(g):
+def r1():
     """The first graph's relation atom operand"""
-    return g.relation
+    return R()
 
 
 @pytest.fixture
-def r1(g):
+def r2():
     """The second graph's relation atom operand"""
-    return g.relation
+    return R()
 
 
-def test_element(e0, r0):
-    assert repr(e0) == "e0 < e0 > e0"
-    assert repr(r0) == "r0 < r0 > r0"
+def test_element(e1, r1):
+    assert repr(e1) == "e1 < e1 > e1"
+    assert repr(r1) == "r1 < r1 > r1"
 
 
-def test_element_mark(e0, r0):
-    assert repr(+e0) == "e0 < +e0 > e0"
-    assert repr(-e0) == "e0 < e0 > e0"
+def test_element_mark(e1, r1):
+    assert repr(+e1) == "e1 < +e1 > e1"
+    assert repr(-e1) == "e1 < e1 > e1"
 
-    assert repr(+r0) == "r0 < +r0 > r0"
-    assert repr(-r0) == "r0 < r0 > r0"
-
-
-def test_element_update(e0, r0):
-    assert repr(e0(x=1)) == "e0 < e0(x=1) > e0"
-    assert repr(e0(**{'foo bar': 'baz'})) == "e0 < e0{'foo bar': 'baz'} > e0"
-
-    assert repr(r0(x=1)) == "r0 < r0(x=1) > r0"
-    assert repr(r0(**{'foo bar': 'baz'})) == "r0 < r0{'foo bar': 'baz'} > r0"
+    assert repr(+r1) == "r1 < +r1 > r1"
+    assert repr(-r1) == "r1 < r1 > r1"
 
 
-def test_element_update_mark(e0, r0):
-    assert repr(+e0(x=1)) == "e0 < +e0(x=1) > e0"
-    assert repr(-e0(x=1)) == "e0 < e0(x=1) > e0"
+def test_element_update(e1, r1):
+    assert repr(e1(x=1)) == "e1 < e1(x=1) > e1"
+    assert repr(e1(**{'foo bar': 'baz'})) == "e1 < e1{'foo bar': 'baz'} > e1"
 
-    assert repr(+r0(x=1)) == "r0 < +r0(x=1) > r0"
-    assert repr(-r0(x=1)) == "r0 < r0(x=1) > r0"
+    assert repr(r1(x=1)) == "r1 < r1(x=1) > r1"
+    assert repr(r1(**{'foo bar': 'baz'})) == "r1 < r1{'foo bar': 'baz'} > r1"
 
 
-def test_element_getattr(e0, r0):
-    assert repr(e0.state) == "e0 < e0.state > e0"
-    assert repr(e0.state.idle) == "e0 < e0.state.idle > e0"
-    assert repr(r0.state) == "r0 < r0.state > r0"
+def test_element_update_mark(e1, r1):
+    assert repr(+e1(x=1)) == "e1 < +e1(x=1) > e1"
+    assert repr(-e1(x=1)) == "e1 < e1(x=1) > e1"
+
+    assert repr(+r1(x=1)) == "r1 < +r1(x=1) > r1"
+    assert repr(-r1(x=1)) == "r1 < r1(x=1) > r1"
+
+
+def test_element_getattr(e1, r1):
+    assert repr(e1.state) == "e1 < e1.state > e1"
+    assert repr(e1.state.idle) == "e1 < e1.state.idle > e1"
+    assert repr(r1.state) == "r1 < r1.state > r1"
     with pytest.raises(NotImplementedError):
-        repr(r0.state.idle)
+        repr(r1.state.idle)
 
 
-def test_element_getitem(e0, r0):
-    assert repr(e0['foo bar']) == "e0 < e0['foo bar'] > e0"
-    assert repr(r0['foo bar']) == "r0 < r0['foo bar'] > r0"
+def test_element_getitem(e1, r1):
+    assert repr(e1['foo bar']) == "e1 < e1['foo bar'] > e1"
+    assert repr(r1['foo bar']) == "r1 < r1['foo bar'] > r1"
 
 
-def test_element_getattr_mark(e0, r0):
-    assert repr(+e0.state) == "e0 < +e0.state > e0"
-    assert repr(-e0.state) == "e0 < e0.state > e0"
-    assert repr(+r0.state) == "r0 < +r0.state > r0"
-    assert repr(-r0.state) == "r0 < r0.state > r0"
+def test_element_getattr_mark(e1, r1):
+    assert repr(+e1.state) == "e1 < +e1.state > e1"
+    assert repr(-e1.state) == "e1 < e1.state > e1"
+    assert repr(+r1.state) == "r1 < +r1.state > r1"
+    assert repr(-r1.state) == "r1 < r1.state > r1"
 
 
-def test_element_getitem_mark(e0, r0):
-    assert repr(+e0['foo bar']) == "e0 < +e0['foo bar'] > e0"
-    assert repr(-e0['foo bar']) == "e0 < e0['foo bar'] > e0"
-    assert repr(+r0['foo bar']) == "r0 < +r0['foo bar'] > r0"
-    assert repr(-r0['foo bar']) == "r0 < r0['foo bar'] > r0"
+def test_element_getitem_mark(e1, r1):
+    assert repr(+e1['foo bar']) == "e1 < +e1['foo bar'] > e1"
+    assert repr(-e1['foo bar']) == "e1 < e1['foo bar'] > e1"
+    assert repr(+r1['foo bar']) == "r1 < +r1['foo bar'] > r1"
+    assert repr(-r1['foo bar']) == "r1 < r1['foo bar'] > r1"
 
 
-def test_element_role_name_cast(e0, r0):
-    assert repr(e0 - 'role') == "e0 < e0 > e0-'role'"
-    assert repr('role' - e0) == "'role'-e0 < e0 > e0"
-    assert repr(r0 - 'role') == "r0 < r0 > r0-'role'"
-    assert repr('role' - r0) == "'role'-r0 < r0 > r0"
+def test_element_role_name_cast(e1, r1):
+    assert repr(e1 - 'role') == "e1 < e1 > e1-'role'"
+    assert repr('role' - e1) == "'role'-e1 < e1 > e1"
+    assert repr(r1 - 'role') == "r1 < r1 > r1-'role'"
+    assert repr('role' - r1) == "'role'-r1 < r1 > r1"
 
 
-def test_element_role_name_open(e0, r0):
+def test_element_role_name_open(e1, r1):
     with pytest.raises(ValueError):
-        _ = e0 * 'role'
+        _ = e1 * 'role'
     with pytest.raises(ValueError):
-        _ = 'role' * e0
-    assert repr(r0 * 'role') == "r0 < r0 > r0*'role'"
-    assert repr('role' * r0) == "'role'*r0 < r0 > r0"
+        _ = 'role' * e1
+    assert repr(r1 * 'role') == "r1 < r1 > r1*'role'"
+    assert repr('role' * r1) == "'role'*r1 < r1 > r1"
 
 
-def test_element_opening_cast(e0, r0):
-    assert repr(e0 - 'role' * r0) == "e0 < e0, r0:(role=e0) > r0"
-    assert repr(e0 - 'ro le' * r0) == "e0 < e0, r0:{'ro le': e0} > r0"
-    assert repr(r0 * 'role' - e0) == "r0 < e0, r0:(role=e0) > e0"
-    assert repr(r0 * 'ro le' - e0) == "r0 < e0, r0:{'ro le': e0} > e0"
+def test_element_opening_cast(e1, r1):
+    assert repr(e1 - 'role' * r1) == "e1 < e1, r1:(role=e1) > r1"
+    assert repr(e1 - 'ro le' * r1) == "e1 < e1, r1:{'ro le': e1} > r1"
+    assert repr(r1 * 'role' - e1) == "r1 < e1, r1:(role=e1) > e1"
+    assert repr(r1 * 'ro le' - e1) == "r1 < e1, r1:{'ro le': e1} > e1"
 
 
-def test_element_casting_open(e0, r0, r1):
-    assert repr((e0 - 'role') * r0) == "e0 < e0, r0:(role=e0) > r0"
-    assert repr(r0 * ('role' - e0)) == "r0 < e0, r0:(role=e0) > e0"
+def test_element_casting_open(e1, r1, r2):
+    assert repr((e1 - 'role') * r1) == "e1 < e1, r1:(role=e1) > r1"
+    assert repr(r1 * ('role' - e1)) == "r1 < e1, r1:(role=e1) > e1"
 
     with pytest.raises(ValueError):
-        (r0 - 'role') * e0
+        (r1 - 'role') * e1
     with pytest.raises(ValueError):
-        e0 * ('role' - r0)
+        e1 * ('role' - r1)
     with pytest.raises(ValueError):
-        (e0 - 'role') * e0
+        (e1 - 'role') * e1
     with pytest.raises(ValueError):
-        e0 * ('role' - e0)
+        e1 * ('role' - e1)
 
-    assert repr((r0 - 'role') * r1) == "r0 < r0, r1:(role=r0) > r1"
-    assert repr(r0 * ('role' - r1)) == "r0 < r1, r0:(role=r1) > r1"
+    assert repr((r1 - 'role') * r2) == "r1 < r1, r2:(role=r1) > r2"
+    assert repr(r1 * ('role' - r2)) == "r2 < r1, r2:(role=r1) > r1"
 
-    assert repr((r0.x - 'role') * r1.y) == "r0 < r0.x, r1.y:(role=r0) > r1"
-    assert repr(r0.x * ('role' - r1.y)) == "r0 < r1.y, r0.x:(role=r1) > r1"
+    assert repr((r1.x - 'role') * r2.y) == "r1 < r1.x, r2.y:(role=r1) > r2"
+    assert repr(r1.x * ('role' - r2.y)) == "r2 < r1.y, r2.x:(role=r1) > r1"
 
-    assert repr((r0.x(a=1) - 'role') * r1.y(b=2)) == \
-        "r0 < r0.x(a=1), r1.y(b=2):(role=r0) > r1"
-    assert repr(r0.x(a=1) * ('role' - r1.y(b=2))) == \
-        "r0 < r1.y(b=2), r0.x(a=1):(role=r1) > r1"
+    assert repr((r1.x(a=1) - 'role') * r2.y(b=2)) == \
+        "r1 < r1.x(a=1), r2.y(b=2):(role=r1) > r2"
+    assert repr(r1.x(a=1) * ('role' - r2.y(b=2))) == \
+        "r2 < r1.y(b=2), r2.x(a=1):(role=r1) > r1"
 
 
-def test_double_cast(e0):
+def test_double_cast(e1):
     with pytest.raises(ValueError):
-        e0 - 'role' - e0
+        e1 - 'role' - e1
 
 
-def test_double_open(r0):
+def test_double_open(r1):
     with pytest.raises(ValueError):
-        r0 * 'role' * r0
+        r1 * 'role' * r1
 
 
-def test_element_edge_element(e0, e1, r0):
-    assert repr(e0 >> e1) == "e0 < e0, e1, r1:(source=e0, target=e1) > e1"
-    assert repr(e0 - 'source' * r0 * 'target' - e1) == \
-        "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
-    assert repr(e0 << e1) == "e0 < e0, e1, r2:(target=e0, source=e1) > e1"
-    assert repr(e0 - 'target' * r0 * 'source' - e1) == \
-        "e0 < e0, e1, r0:(target=e0, source=e1) > e1"
+def test_element_edge_element(e1, e2, r1):
+    assert repr(e1 >> e2) == "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
+    assert repr(e1 - 'source' * r1 * 'target' - e2) == \
+        "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
+    assert repr(e1 << e2) == "e1 < e1, e2, r1:(target=e1, source=e2) > e2"
+    assert repr(e1 - 'target' * r1 * 'source' - e2) == \
+        "e1 < e1, e2, r1:(target=e1, source=e2) > e2"
 
 
-def test_element_edge_role(e0, r0):
-    assert repr(e0 >> r0) == "e0 < e0, r0:(source=e0) > r0"
-    assert repr(e0 << r0) == "e0 < e0, r0:(target=e0) > r0"
-    assert repr(r0 >> e0) == "r0 < e0, r0:(target=e0) > e0"
-    assert repr(r0 << e0) == "r0 < e0, r0:(source=e0) > e0"
+def test_element_edge_role(e1, r1):
+    assert repr(e1 >> r1) == "e1 < e1, r1:(source=e1) > r1"
+    assert repr(e1 << r1) == "e1 < e1, r1:(target=e1) > r1"
+    assert repr(r1 >> e1) == "r1 < e1, r1:(target=e1) > e1"
+    assert repr(r1 << e1) == "r1 < e1, r1:(source=e1) > e1"
 
 
-def test_element_edge_role_edge_element(e0, r0, e1):
-    assert repr(e0 >> (r0 >> e1)) == \
-        "e0 < e0, e1, r0:(target=e1, source=e0) > e1"
-    assert repr((e0 >> r0) >> e1) == \
-        "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
-    assert repr(e0 >> r0 >> e1) == \
-        "e0 < e0, e1, r0:(source=e0, target=e1) > e1"
-    assert repr(e0 << r0 << e1) == \
-        "e0 < e0, e1, r0:(target=e0, source=e1) > e1"
+def test_element_edge_role_edge_element(e1, r1, e2):
+    assert repr(e1 >> (r1 >> e2)) == \
+        "e1 < e1, e2, r1:(target=e2, source=e1) > e2"
+    assert repr((e1 >> r1) >> e2) == \
+        "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
+    assert repr(e1 >> r1 >> e2) == \
+        "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
+    assert repr(e1 << r1 << e2) == \
+        "e1 < e1, e2, r1:(target=e1, source=e2) > e2"
 
 
 def test_refs():
-    g = KG()
-    assert repr((x := g.e.x).y >> x) == \
-        'e0 < e0.x.y, r0:(source=e0, target=e0) > e0'
+    assert repr((x := E().x).y >> x) == \
+        'e1 < e1.x.y, r1:(source=e1, target=e1) > e1'
     x = None
 
-    g = KG()
-    assert repr((x := g.e.x) >> x.y) == \
-        'e0 < e0.x.y, r0:(source=e0, target=e0) > e0'
+    assert repr((x := E().x) >> x.y) == \
+        'e1 < e1.x.y, r1:(source=e1, target=e1) > e1'
     x = None
 
-    g = KG()
-    assert repr((x := g.e.x) >> +x) == \
-        'e0 < +e0.x, r0:(source=e0, target=e0) > e0'
+    assert repr((x := E().x) >> +x) == \
+        'e1 < +e1.x, r1:(source=e1, target=e1) > e1'
     x = None
 
-    g = KG()
-    assert repr((x := +g.e.x) >> -x) == \
-        'e0 < e0.x, r0:(source=e0, target=e0) > e0'
+    assert repr((x := +E().x) >> -x) == \
+        'e1 < e1.x, r1:(source=e1, target=e1) > e1'
     x = None
 
-    g = KG()
-    assert repr(+(x := g.e.x) >> x) == \
-        'e0 < e0.x, r0:(source=e0, target=e0) > e0'
+    assert repr(+(x := E().x) >> x) == \
+        'e1 < e1.x, r1:(source=e1, target=e1) > e1'
     x = None
 
-    g = KG()
-    assert repr((x := g.e.x >> g.e.y) >> x) == (
-        'e0 < '
-        'e0.x, e1.y, r0:(source=e0, target=e1), r1:(source=e1, target=e0) '
+    assert repr((x := E().x >> E().y) >> x) == (
+        'e1 < '
+        'e1.x, e2.y, r1:(source=e1, target=e2), r2:(source=e2, target=e1) '
+        '> e2'
+    )
+    x = None
+
+    assert repr((x := E().x(attr1=10)) >> E().y >> x(attr2=20)) == (
+        'e1 < '
+        'e2.y, '
+        'r1:(source=e1, target=e2), '
+        'e1.x(attr1=10, attr2=20), '
+        'r2:(source=e2, target=e1) '
         '> e1'
     )
     x = None
 
-    g = KG()
-    assert repr((x := g.e.x(attr1=10)) >> g.e.y >> x(attr2=20)) == (
-        'e0 < '
-        'e1.y, '
-        'r0:(source=e0, target=e1), '
-        'e0.x(attr1=10, attr2=20), '
-        'r1:(source=e1, target=e0) '
-        '> e0'
-    )
-    x = None
-
-    g = KG()
-    assert repr((x := g.e.x(attr1=10)) >> g.e.y >> x(attr1=20)) == (
-        'e0 < '
-        'e1.y, '
-        'r0:(source=e0, target=e1), '
-        'e0.x(attr1=20), '
-        'r1:(source=e1, target=e0) '
-        '> e0'
+    assert repr((x := E().x(attr1=10)) >> E().y >> x(attr1=20)) == (
+        'e1 < '
+        'e2.y, '
+        'r1:(source=e1, target=e2), '
+        'e1.x(attr1=20), '
+        'r2:(source=e2, target=e1) '
+        '> e1'
     )
     x = None
 
 
-def test_complex(g):
+def test_complex():
     assert repr(
-        (a := g.e.ll_state.Advertising(
+        (a := E().ll_state.Advertising(
                 comment='Device is an "advertiser"')) >>
-        g.r.ll_state_transition >>
-        g.e.ll_state.Standby(comment='No transmit/receive') >>
-        g.r.ll_state_transition >> a
+        R().ll_state_transition >>
+        E().ll_state.Standby(comment='No transmit/receive') >>
+        R().ll_state_transition >> a
     ) == (
-        "e0 < "
-        "e1.ll_state.Standby(comment='No transmit/receive'), "
-        "r0.ll_state_transition:(source=e0, target=e1), "
-        "e0.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
-        "r1.ll_state_transition:(source=e1, target=e0) "
-        "> e0"
+        "e1 < "
+        "e2.ll_state.Standby(comment='No transmit/receive'), "
+        "r1.ll_state_transition:(source=e1, target=e2), "
+        "e1.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
+        "r2.ll_state_transition:(source=e2, target=e1) "
+        "> e1"
     )

@@ -19,17 +19,11 @@ class Graph:
 
     def __init__(self):
         """Initialize the knowledge graph"""
-        # The ID next created entity pattern will use
-        self.next_entity_id = 0
-        # The ID next created relation pattern will use
-        self.next_relation_id = 0
 
     @property
     def entity(self):
         """A graph pattern matching a unique entity"""
-        ep = EntityPattern(self.next_entity_id << 1, {})
-        self.next_entity_id += 1
-        return GraphPattern(self, {ep: False}, ep, ep)
+        return EntityGraphPattern()
 
     @property
     def e(self):
@@ -39,9 +33,7 @@ class Graph:
     @property
     def relation(self):
         """A graph pattern matching a unique relation"""
-        rp = RelationPattern(self.next_relation_id << 1 | 1, {}, {})
-        self.next_relation_id += 1
-        return GraphPattern(self, {rp: False}, rp, rp)
+        return RelationGraphPattern()
 
     @property
     def r(self):
@@ -108,6 +100,9 @@ class AtomPattern(ABC):
 class ElementPattern(AtomPattern):
     """An abstract element (relation or entity) pattern"""
 
+    # The ID next created element pattern can use
+    __NEXT_ID = 1
+
     # The tuple of the names of implicit attributes in order of nesting
     IMPLICIT_ATTRS: Tuple[str, ...] = ("_type",)
 
@@ -116,11 +111,16 @@ class ElementPattern(AtomPattern):
         Initialize the element pattern.
 
         Args:
-            id:     The element ID.
+            id:     The element ID. Zero to assign next available.
             attrs:  The attribute dictionary.
         """
         # The element ID
+        if id == 0:
+            id = ElementPattern.__NEXT_ID
+            ElementPattern.__NEXT_ID += 1
         self.id = id
+        # The element's representation ID (zero means not set)
+        self.repr_id = 0
 
         # Substitute implicit attrs
         if "" in attrs:
@@ -173,7 +173,7 @@ class EntityPattern(ElementPattern):
     IMPLICIT_ATTRS = ElementPattern.IMPLICIT_ATTRS + ("_name",)
 
     def __abbr__(self):
-        return f"e{self.id >> 1}"
+        return f"e{self.repr_id or '#' + str(self.id)}"
 
     def with_updated_attrs(self, attrs: dict[str, Union[str, int]]) -> \
             Tuple['EntityPattern', 'EntityPattern']:
@@ -202,7 +202,7 @@ class RelationPattern(ElementPattern):
         Initialize the relation pattern.
 
         Args:
-            id:     The relation element ID.
+            id:     The relation element ID. Zero to assign next available.
             attrs:  The attribute dictionary.
             roles:  The role dictionary.
         """
@@ -210,7 +210,7 @@ class RelationPattern(ElementPattern):
         self.roles = roles
 
     def __abbr__(self):
-        return f"r{self.id >> 1}"
+        return f"r{self.repr_id or '#' + str(self.id)}"
 
     def __repr__(self):
         return super().__repr__() + \
@@ -350,10 +350,9 @@ class OpeningPattern(AttachedRolePattern):
 
 
 class GraphPattern:
-    """A (sub)graph pattern"""
+    """A graph pattern"""
 
     def __init__(self,
-                 graph: Graph,
                  elements: dict[ElementPattern, bool],
                  left: AtomPattern,
                  right: AtomPattern):
@@ -361,7 +360,6 @@ class GraphPattern:
         Initialize the graph pattern.
 
         Args:
-            graph:      The supergraph of the graph this pattern is matching.
             elements:   A dictionary of patterns matching elements
                         (entities or relations) belonging to the subgraph, and
                         the mark boolean.
@@ -399,7 +397,6 @@ class GraphPattern:
         assert right_element is None or right_element in elements, \
             "Unknown right element (reference)"
 
-        self.graph = graph
         self.elements = elements
         self.entities = entities
         self.relations = relations
@@ -410,23 +407,34 @@ class GraphPattern:
         return f"{self.left!r} {...} {self.right!r}"
 
     def __repr__(self):
-        if isinstance(self.left, OpeningPattern):
-            left = f"{self.left.name!r}*{abbr(self.left.element)}"
-        elif isinstance(self.left, CastingPattern):
-            left = f"{self.left.name!r}-{abbr(self.left.element)}"
-        else:
-            left = abbr(self.left)
+        # Assign representation IDs to all entities
+        for idx, entity in enumerate(self.entities):
+            entity.repr_id = idx + 1
+        # Assign representation IDs to all relations
+        for idx, relation in enumerate(self.relations):
+            relation.repr_id = idx + 1
+        try:
+            if isinstance(self.left, OpeningPattern):
+                left = f"{self.left.name!r}*{abbr(self.left.element)}"
+            elif isinstance(self.left, CastingPattern):
+                left = f"{self.left.name!r}-{abbr(self.left.element)}"
+            else:
+                left = abbr(self.left)
 
-        if isinstance(self.right, OpeningPattern):
-            right = f"{abbr(self.right.element)}*{self.right.name!r}"
-        elif isinstance(self.right, CastingPattern):
-            right = f"{abbr(self.right.element)}-{self.right.name!r}"
-        else:
-            right = abbr(self.right)
+            if isinstance(self.right, OpeningPattern):
+                right = f"{abbr(self.right.element)}*{self.right.name!r}"
+            elif isinstance(self.right, CastingPattern):
+                right = f"{abbr(self.right.element)}-{self.right.name!r}"
+            else:
+                right = abbr(self.right)
 
-        return f"{left} < " + ", ".join(
-            ("", "+")[c] + repr(e) for e, c in self.elements.items()
-        ) + f" > {right}"
+            return f"{left} < " + ", ".join(
+                ("", "+")[c] + repr(e) for e, c in self.elements.items()
+            ) + f" > {right}"
+        finally:
+            # Remove the representation IDs from all elements
+            for element in self.elements:
+                element.repr_id = 0
 
     def with_replaced_atom(self, old: AtomPattern, new: AtomPattern) -> \
             'GraphPattern':
@@ -454,7 +462,6 @@ class GraphPattern:
             return boundary
 
         gp = GraphPattern(
-            self.graph,
             update_elements(self.elements, old, new),
             update_boundary(self.left, old, new),
             update_boundary(self.right, old, new),
@@ -466,8 +473,6 @@ class GraphPattern:
         """Merge two graph patterns"""
         if not isinstance(other, GraphPattern):
             return NotImplemented
-        if other.graph is not self.graph:
-            raise ValueError
 
         elements = self.elements.copy()
         id_elements = {e.id: e for e in elements}
@@ -488,7 +493,6 @@ class GraphPattern:
             return boundary
 
         return GraphPattern(
-            self.graph,
             elements,
             update_boundary(self.left),
             update_boundary(other.right)
@@ -497,7 +501,6 @@ class GraphPattern:
     def __pos__(self):
         """Mark all elements in the graph pattern"""
         return GraphPattern(
-            self.graph,
             {element: True for element in self.elements},
             self.left,
             self.right
@@ -506,7 +509,6 @@ class GraphPattern:
     def __neg__(self):
         """Unmark all elements in the graph pattern"""
         return GraphPattern(
-            self.graph,
             {element: False for element in self.elements},
             self.left,
             self.right
@@ -543,18 +545,15 @@ class GraphPattern:
 
         if isinstance(left, str):
             left = DetachedRolePattern(left)
-            left = GraphPattern(right.graph, {}, left, left)
+            left = GraphPattern({}, left, left)
         elif not isinstance(left, GraphPattern):
             return NotImplemented
 
         if isinstance(right, str):
             right = DetachedRolePattern(right)
-            right = GraphPattern(left.graph, {}, right, right)
+            right = GraphPattern({}, right, right)
         elif not isinstance(right, GraphPattern):
             return NotImplemented
-
-        if left.graph is not right.graph:
-            raise ValueError
 
         left_atom = left.right
         right_atom = right.left
@@ -606,18 +605,15 @@ class GraphPattern:
 
         if isinstance(left, str):
             left = DetachedRolePattern(left)
-            left = GraphPattern(right.graph, {}, left, left)
+            left = GraphPattern({}, left, left)
         elif not isinstance(left, GraphPattern):
             return NotImplemented
 
         if isinstance(right, str):
             right = DetachedRolePattern(right)
-            right = GraphPattern(left.graph, {}, right, right)
+            right = GraphPattern({}, right, right)
         elif not isinstance(right, GraphPattern):
             return NotImplemented
-
-        if left.graph is not right.graph:
-            raise ValueError
 
         left_atom = left.right
         right_atom = right.left
@@ -670,16 +666,13 @@ class GraphPattern:
            not isinstance(right, GraphPattern):
             return NotImplemented
 
-        if left.graph is not right.graph:
-            raise ValueError
-
         ltr = op == ">>"
         left_atom = left.right
         right_atom = right.left
 
         if isinstance(left_atom, EntityPattern) and \
            isinstance(right_atom, EntityPattern):
-            relation = left.graph.relation
+            relation = RelationGraphPattern()
             if ltr:
                 return left - "source" * relation * "target" - right
             else:
@@ -714,3 +707,31 @@ class GraphPattern:
     def __rlshift__(self, other) -> 'GraphPattern':
         """Create edge/role with other graph pattern, for O << S expression"""
         return self._shift(other, "<<", self)
+
+
+class EntityGraphPattern(GraphPattern):
+    """A single-entity graph pattern"""
+
+    def __init__(self, **attrs: Union[str, int]):
+        """
+        Initialize the single-entity graph pattern.
+
+        Args:
+            attrs:  The attribute dictionary.
+        """
+        ep = EntityPattern(0, attrs)
+        super().__init__({ep: False}, ep, ep)
+
+
+class RelationGraphPattern(GraphPattern):
+    """A single-relation graph pattern"""
+
+    def __init__(self, **attrs: Union[str, int]):
+        """
+        Initialize the single-relation graph pattern.
+
+        Args:
+            attrs:  The relation's attribute dictionary.
+        """
+        ep = RelationPattern(0, attrs, {})
+        super().__init__({ep: False}, ep, ep)
