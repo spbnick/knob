@@ -4,7 +4,7 @@ KNOB - Knowledge builder - knowledge (hyper)graph.
 NOTE: All binary graph operators are left-associative
 """
 
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union
 from abc import ABC, abstractmethod
 
 # We're being abstract here,
@@ -119,8 +119,6 @@ class ElementPattern(AtomPattern):
             id = ElementPattern.__NEXT_ID
             ElementPattern.__NEXT_ID += 1
         self.id = id
-        # The element's representation ID (zero means not set)
-        self.repr_id = 0
 
         # Substitute implicit attrs
         if "" in attrs:
@@ -133,16 +131,9 @@ class ElementPattern(AtomPattern):
 
         self.attrs = attrs
 
-    def __hash__(self):
-        return self.id
-
-    def __eq__(self, other):
-        if isinstance(other, ElementPattern):
-            return self.id == other.id
-        return NotImplemented
-
-    def __repr__(self):
-        result = abbr(self)
+    def attrs_repr(self):
+        """Generate a string representation of element attributes"""
+        result = ""
         explicit_attrs = self.attrs.copy()
         for implicit_attr in self.IMPLICIT_ATTRS:
             if implicit_attr not in explicit_attrs:
@@ -155,6 +146,9 @@ class ElementPattern(AtomPattern):
         if explicit_attrs:
             result += abbr(explicit_attrs)
         return result
+
+    def __repr__(self):
+        return abbr(self) + self.attrs_repr()
 
     @abstractmethod
     def __or__(self, other) -> 'ElementPattern':
@@ -173,7 +167,7 @@ class EntityPattern(ElementPattern):
     IMPLICIT_ATTRS = ElementPattern.IMPLICIT_ATTRS + ("_name",)
 
     def __abbr__(self):
-        return f"e{self.repr_id or '#' + str(self.id)}"
+        return f"e#{self.id}"
 
     def with_updated_attrs(self, attrs: dict[str, Union[str, int]]) -> \
             Tuple['EntityPattern', 'EntityPattern']:
@@ -197,24 +191,28 @@ class RelationPattern(ElementPattern):
     def __init__(self,
                  id: int,
                  attrs: dict[str, Union[str, int]],
-                 roles: dict[str, ElementPattern]):
+                 roles: dict[str, int]):
         """
         Initialize the relation pattern.
 
         Args:
             id:     The relation element ID. Zero to assign next available.
             attrs:  The attribute dictionary.
-            roles:  The role dictionary.
+            roles:  A dictionary of role names and the IDs of actor elements.
         """
         super().__init__(id, attrs)
         self.roles = roles
 
     def __abbr__(self):
-        return f"r{self.repr_id or '#' + str(self.id)}"
+        return f"r#{self.id}"
 
     def __repr__(self):
-        return super().__repr__() + \
-            (f":{abbr(self.roles)}" if self.roles else "")
+        return super().__repr__() + (
+            ":(" + ", ".join(
+                (n if n.isidentifier() else repr(n)) + "=#" + str(a_id)
+                for n, a_id in self.roles.items()
+            ) + ")" if self.roles else ""
+        )
 
     def with_updated_attrs(self, attrs: dict[str, Union[str, int]]) -> \
             Tuple['RelationPattern', 'RelationPattern']:
@@ -222,7 +220,7 @@ class RelationPattern(ElementPattern):
         return self, \
             RelationPattern(self.id, self.attrs | attrs, self.roles)
 
-    def with_updated_roles(self, roles: dict[str, ElementPattern]) -> \
+    def with_updated_roles(self, roles: dict[str, int]) -> \
             Tuple['RelationPattern', 'RelationPattern']:
         """Duplicate the pattern with roles updated"""
         return self, \
@@ -243,16 +241,19 @@ class RelationPattern(ElementPattern):
 class RolePattern(AtomPattern):
     """A role pattern"""
 
-    def __init__(self, name: str, element: Optional[ElementPattern]):
+    def __init__(self, name: str, element_id: int):
         """
         Initialize the role pattern.
 
         Args:
             name:       The name of the role.
-            element:    The element attached to the role, or None.
+            element_id: The ID of the element attached to the role,
+                        or zero, if none.
         """
+        assert isinstance(name, str)
+        assert isinstance(element_id, int)
         self.name = name
-        self.element = element
+        self.element_id = element_id
 
 
 class DetachedRolePattern(RolePattern):
@@ -265,9 +266,8 @@ class DetachedRolePattern(RolePattern):
         Args:
             name:       The name of the role.
         """
-        super().__init__(name, None)
-        # Satisfy mypy
-        self.element: None = None
+        assert isinstance(name, str)
+        super().__init__(name, 0)
 
     def __abbr__(self):
         return repr(self.name)
@@ -275,97 +275,94 @@ class DetachedRolePattern(RolePattern):
     def __repr__(self):
         return repr(self.name)
 
-    def open(self, relation: RelationPattern) -> \
+    def open(self, relation_id: int) -> \
             Tuple['DetachedRolePattern', 'OpeningPattern']:
         """Open the role with a relationship"""
-        return self, OpeningPattern(relation, self.name)
+        return self, OpeningPattern(relation_id, self.name)
 
-    def cast(self, element: ElementPattern) -> \
+    def cast(self, element_id: int) -> \
             Tuple['DetachedRolePattern', 'CastingPattern']:
         """Cast an element with the role"""
-        return self, CastingPattern(self.name, element)
+        return self, CastingPattern(self.name, element_id)
 
 
 class AttachedRolePattern(RolePattern):
     """An attached (opened/cast) role pattern"""
 
-    def __init__(self, name: str, element: ElementPattern):
+    def __init__(self, name: str, element_id: int):
         """
         Initialize the attached role pattern.
 
         Args:
             name:       The name of the role.
-            element:    The element attached to the role.
+            element_id: The ID of the element attached to the role.
         """
-        assert isinstance(element, ElementPattern)
-        super().__init__(name, element)
-        # Satisfy mypy
-        self.element: ElementPattern = element
+        assert isinstance(name, str)
+        assert isinstance(element_id, int)
+        super().__init__(name, element_id)
 
     @abstractmethod
-    def with_replaced_element(self, element: ElementPattern) -> \
+    def with_replaced_element_id(self, element_id: int) -> \
             'AttachedRolePattern':
-        """Create a new attached pattern with the element replaced"""
+        """Create a new attached pattern with the element ID replaced"""
 
 
 class CastingPattern(AttachedRolePattern):
     """A role casting (an element acting a role) pattern"""
 
     def __abbr__(self):
-        return f"{self.name!r}-{abbr(self.element)}"
+        return f"{self.name!r}-#{self.element_id}"
 
     def __repr__(self):
-        return f"{self.name!r}-{self.element!r}"
+        return f"{self.name!r}-#{self.element_id}"
 
-    def with_replaced_element(self, element: ElementPattern) -> \
+    def with_replaced_element_id(self, element_id: int) -> \
             'CastingPattern':
-        return CastingPattern(self.name, element)
+        return CastingPattern(self.name, element_id)
 
 
 class OpeningPattern(AttachedRolePattern):
     """A role opening (a relationship's open role) pattern"""
 
-    def __init__(self, relation: RelationPattern, name: str):
+    def __init__(self, relation_id: int, name: str):
         """
         Initialize the opening pattern.
 
         Args:
-            relation:   The relation with the role open.
-            name:       The name of the role.
+            relation_id:    The ID of the relation with the role open.
+            name:           The name of the role.
         """
-        super().__init__(name, relation)
-        # Satisfy mypy
-        self.element: RelationPattern = relation
+        super().__init__(name, relation_id)
 
     def __abbr__(self):
-        return f"{abbr(self.element)}*{self.name!r}"
+        return f"#{self.element_id}*{self.name!r}"
 
     def __repr__(self):
-        return f"{self.element!r}*{self.name!r}"
+        return f"#{self.element_id}*{self.name!r}"
 
-    def with_replaced_element(self, element: ElementPattern) -> \
+    def with_replaced_element_id(self, element_id: int) -> \
             'OpeningPattern':
-        assert isinstance(element, RelationPattern)
-        return OpeningPattern(element, self.name)
+        assert isinstance(element_id, int)
+        return OpeningPattern(element_id, self.name)
 
 
 class GraphPattern:
     """A graph pattern"""
 
     def __init__(self,
-                 elements: dict[ElementPattern, bool],
+                 elements: dict[int, ElementPattern],
+                 marks: set[int],
                  left: AtomPattern,
                  right: AtomPattern):
         """
         Initialize the graph pattern.
 
         Args:
-            elements:   A dictionary of patterns matching elements
-                        (entities or relations) belonging to the subgraph, and
-                        the mark boolean.
-                        Roles in any relation patterns contained in this
-                        dictionary can only reference element patterns from
-                        the same dictionary.
+            elements:   A dictionary of element IDs and corresponding element
+                        patterns. The pattern IDs must match corresponding
+                        dictionary keys.
+            marks:      A set of IDs of marked elements. Must be a subset of
+                        "elements" keys.
             left:       The left-side atom pattern to use when using the
                         graph pattern on the right side of an operator.
                         Must be, or refer to, an element in "elements".
@@ -373,33 +370,37 @@ class GraphPattern:
                         graph pattern on the left side of an operator.
                         Must be, or refer to, an element in "elements".
         """
-        entities = {
-            e: c
-            for e, c in elements.items() if isinstance(e, EntityPattern)
-        }
-        relations = {
-            e: c
-            for e, c in elements.items() if isinstance(e, RelationPattern)
-        }
-        assert set(elements) >= {
-            element
-            for relation in relations
-            for element in relation.roles.values()
-        }, "A relation's role is played by an unknown element"
+        assert isinstance(elements, dict)
+        assert all(isinstance(id, int) and
+                   isinstance(e, ElementPattern) and
+                   id == e.id
+                   for id, e in elements.items())
+        assert isinstance(marks, set)
+        assert marks <= set(elements)
+        assert all(
+            a_id in elements
+            for e in elements.values() if isinstance(e, RelationPattern)
+            for a_id in e.roles.values()
+        ), "A relation references an unknown actor element"
 
-        def get_atom_element(atom: AtomPattern):
-            return atom.element if isinstance(atom, RolePattern) else atom
+        def get_atom_id(atom: AtomPattern):
+            if isinstance(atom, RolePattern):
+                return atom.element_id
+            elif isinstance(atom, ElementPattern):
+                return atom.id
+            else:
+                assert False, f"Unexpected atom type {type(atom)}"
+                return 0
 
-        left_element = get_atom_element(left)
-        right_element = get_atom_element(right)
-        assert left_element is None or left_element in elements, \
+        left_id = get_atom_id(left)
+        right_id = get_atom_id(right)
+        assert left_id == 0 or left_id in elements, \
             "Unknown left element (reference)"
-        assert right_element is None or right_element in elements, \
+        assert right_id == 0 or right_id in elements, \
             "Unknown right element (reference)"
 
         self.elements = elements
-        self.entities = entities
-        self.relations = relations
+        self.marks = marks
         self.left = left
         self.right = right
 
@@ -407,40 +408,67 @@ class GraphPattern:
         return f"{self.left!r} {...} {self.right!r}"
 
     def __repr__(self):
-        # Assign representation IDs to all entities
-        for idx, entity in enumerate(self.entities):
-            entity.repr_id = idx + 1
-        # Assign representation IDs to all relations
-        for idx, relation in enumerate(self.relations):
-            relation.repr_id = idx + 1
-        try:
-            if isinstance(self.left, OpeningPattern):
-                left = f"{self.left.name!r}*{abbr(self.left.element)}"
-            elif isinstance(self.left, CastingPattern):
-                left = f"{self.left.name!r}-{abbr(self.left.element)}"
-            else:
-                left = abbr(self.left)
+        # It's OK, pylint: disable=too-many-branches
 
-            if isinstance(self.right, OpeningPattern):
-                right = f"{abbr(self.right.element)}*{self.right.name!r}"
-            elif isinstance(self.right, CastingPattern):
-                right = f"{abbr(self.right.element)}-{self.right.name!r}"
-            else:
-                right = abbr(self.right)
+        # A list of entity IDs
+        entity_ids = []
+        # A list of relation IDs
+        relation_ids = []
+        # A dictionary of element IDs and repr (signature, body) tuples
+        reprs = {}
 
-            return f"{left} < " + ", ".join(
-                ("", "+")[c] + repr(e) for e, c in self.elements.items()
-            ) + f" > {right}"
-        finally:
-            # Remove the representation IDs from all elements
-            for element in self.elements:
-                element.repr_id = 0
+        # Generate pattern-unique element signatures
+        for id, element in self.elements.items():
+            if isinstance(element, EntityPattern):
+                entity_ids.append(id)
+                reprs[id] = (f"e{len(entity_ids)}",)
+            elif isinstance(element, RelationPattern):
+                relation_ids.append(id)
+                reprs[id] = (f"r{len(relation_ids)}",)
+        # Generate element bodies
+        for id, element in self.elements.items():
+            body = element.attrs_repr()
+            if isinstance(element, RelationPattern):
+                if any(not n.isidentifier() for n in element.roles):
+                    body += ":{" + ", ".join(
+                        repr(n) + ": " + reprs[a_id][0]
+                        for n, a_id in element.roles.items()
+                    ) + "}"
+                elif element.roles:
+                    body += ":(" + ", ".join(
+                        n + "=" + reprs[a_id][0]
+                        for n, a_id in element.roles.items()
+                    ) + ")"
+            reprs[id] += (body,)
+
+        if isinstance(self.left, OpeningPattern):
+            left = f"{self.left.name!r}*{reprs[self.left.element_id][0]}"
+        elif isinstance(self.left, CastingPattern):
+            left = f"{self.left.name!r}-{reprs[self.left.element_id][0]}"
+        elif isinstance(self.left, ElementPattern):
+            left = reprs[self.left.id][0]
+        else:
+            left = abbr(self.left)
+
+        if isinstance(self.right, OpeningPattern):
+            right = f"{reprs[self.right.element_id][0]}*{self.right.name!r}"
+        elif isinstance(self.right, CastingPattern):
+            right = f"{reprs[self.right.element_id][0]}-{self.right.name!r}"
+        elif isinstance(self.right, ElementPattern):
+            right = reprs[self.right.id][0]
+        else:
+            right = abbr(self.right)
+
+        return f"{left} < " + ", ".join(
+            ("", "+")[id in self.marks] + "".join(reprs[id])
+            for id in (entity_ids + relation_ids)
+        ) + f" > {right}"
 
     def with_replaced_atom(self, old: AtomPattern, new: AtomPattern) -> \
             'GraphPattern':
         """Create a duplicate graph pattern with an atom pattern replaced"""
-        assert not isinstance(old, ElementPattern) or old in self.elements, \
-            "Replacing unknown element pattern"
+        assert not isinstance(old, ElementPattern) or \
+            old.id in self.elements, "Replacing unknown element pattern"
         assert isinstance(old, ElementPattern) <= \
             isinstance(new, ElementPattern), \
             "Cannot downgrade element pattern to a role pattern"
@@ -448,21 +476,25 @@ class GraphPattern:
         def update_elements(elements, old, new):
             if isinstance(old, ElementPattern) and \
                     isinstance(new, ElementPattern):
+                assert old.id == new.id, \
+                    f"New element has different ID ({new.id != old.id})"
                 elements = elements.copy()
-                elements[new] = elements.pop(old)
+                elements[new.id] = new
             return elements
 
         def update_boundary(boundary, old, new):
             if old is boundary:
                 return new
             elif isinstance(boundary, AttachedRolePattern) and \
-                    boundary.element is old:
+                    isinstance(old, ElementPattern) and \
+                    boundary.element_id == old.id:
                 assert isinstance(new, ElementPattern)
-                return boundary.with_replaced_element(new)
+                return boundary.with_replaced_element_id(new.id)
             return boundary
 
         gp = GraphPattern(
             update_elements(self.elements, old, new),
+            self.marks,
             update_boundary(self.left, old, new),
             update_boundary(self.right, old, new),
         )
@@ -473,35 +505,16 @@ class GraphPattern:
         """Merge two graph patterns"""
         if not isinstance(other, GraphPattern):
             return NotImplemented
-
         elements = self.elements.copy()
-        id_elements = {e.id: e for e in elements}
-        for element, mark in other.elements.items():
-            if element.id in id_elements:
-                element = id_elements[element.id] | element
-            id_elements[element.id] = element
-            elements.pop(element, None)
-            elements[element] = mark
-
-        def update_boundary(boundary):
-            if isinstance(boundary, AttachedRolePattern):
-                return boundary.with_replaced_element(
-                    id_elements[boundary.element.id]
-                )
-            elif isinstance(boundary, ElementPattern):
-                return id_elements[boundary.id]
-            return boundary
-
-        return GraphPattern(
-            elements,
-            update_boundary(self.left),
-            update_boundary(other.right)
-        )
+        for id, element in other.elements.items():
+            elements[id] = elements.get(id, element) | element
+        return GraphPattern(elements, other.marks, self.left, other.right)
 
     def __pos__(self):
         """Mark all elements in the graph pattern"""
         return GraphPattern(
-            {element: True for element in self.elements},
+            self.elements,
+            set(self.elements),
             self.left,
             self.right
         )
@@ -509,7 +522,8 @@ class GraphPattern:
     def __neg__(self):
         """Unmark all elements in the graph pattern"""
         return GraphPattern(
-            {element: False for element in self.elements},
+            self.elements,
+            set(),
             self.left,
             self.right
         )
@@ -545,13 +559,13 @@ class GraphPattern:
 
         if isinstance(left, str):
             left = DetachedRolePattern(left)
-            left = GraphPattern({}, left, left)
+            left = GraphPattern({}, set(), left, left)
         elif not isinstance(left, GraphPattern):
             return NotImplemented
 
         if isinstance(right, str):
             right = DetachedRolePattern(right)
-            right = GraphPattern({}, right, right)
+            right = GraphPattern({}, set(), right, right)
         elif not isinstance(right, GraphPattern):
             return NotImplemented
 
@@ -577,15 +591,15 @@ class GraphPattern:
 
         # If we're completing a role
         if isinstance(role_or_opening, OpeningPattern):
-            return (left | right).with_replaced_atom(
-                *role_or_opening.element.with_updated_roles(
-                    {role_or_opening.name: element}
-                )
-            )
+            combined = left | right
+            relation = combined.elements[role_or_opening.element_id]
+            return combined.with_replaced_atom(*relation.with_updated_roles(
+                {role_or_opening.name: element.id}
+            ))
         # Else, we're casting an element for the role
         else:
             return (left | right).with_replaced_atom(
-                *role_or_opening.cast(element)
+                *role_or_opening.cast(element.id)
             )
 
     def __sub__(self, other) -> 'GraphPattern':
@@ -605,13 +619,13 @@ class GraphPattern:
 
         if isinstance(left, str):
             left = DetachedRolePattern(left)
-            left = GraphPattern({}, left, left)
+            left = GraphPattern({}, set(), left, left)
         elif not isinstance(left, GraphPattern):
             return NotImplemented
 
         if isinstance(right, str):
             right = DetachedRolePattern(right)
-            right = GraphPattern({}, right, right)
+            right = GraphPattern({}, set(), right, right)
         elif not isinstance(right, GraphPattern):
             return NotImplemented
 
@@ -639,13 +653,13 @@ class GraphPattern:
         if isinstance(role_or_casting, CastingPattern):
             return (left | right).with_replaced_atom(
                 *relation.with_updated_roles(
-                    {role_or_casting.name: role_or_casting.element}
+                    {role_or_casting.name: role_or_casting.element_id}
                 )
             )
         # Else, we're opening a role with the relation
         else:
             return (left | right).with_replaced_atom(
-                *role_or_casting.open(relation)
+                *role_or_casting.open(relation.id)
             )
 
     def __mul__(self, other) -> 'GraphPattern':
@@ -720,7 +734,7 @@ class EntityGraphPattern(GraphPattern):
             attrs:  The attribute dictionary.
         """
         ep = EntityPattern(0, attrs)
-        super().__init__({ep: False}, ep, ep)
+        super().__init__({ep.id: ep}, set(), ep, ep)
 
 
 class RelationGraphPattern(GraphPattern):
@@ -733,5 +747,5 @@ class RelationGraphPattern(GraphPattern):
         Args:
             attrs:  The relation's attribute dictionary.
         """
-        ep = RelationPattern(0, attrs, {})
-        super().__init__({ep: False}, ep, ep)
+        rp = RelationPattern(0, attrs, {})
+        super().__init__({rp.id: rp}, set(), rp, rp)

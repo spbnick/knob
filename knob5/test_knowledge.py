@@ -125,15 +125,15 @@ def test_element_casting_open(e1, r1, r2):
         e1 * ('role' - e1)
 
     assert repr((r1 - 'role') * r2) == "r1 < r1, r2:(role=r1) > r2"
-    assert repr(r1 * ('role' - r2)) == "r2 < r1, r2:(role=r1) > r1"
+    assert repr(r1 * ('role' - r2)) == "r1 < r1:(role=r2), r2 > r2"
 
     assert repr((r1.x - 'role') * r2.y) == "r1 < r1.x, r2.y:(role=r1) > r2"
-    assert repr(r1.x * ('role' - r2.y)) == "r2 < r1.y, r2.x:(role=r1) > r1"
+    assert repr(r1.x * ('role' - r2.y)) == "r1 < r1.x:(role=r2), r2.y > r2"
 
     assert repr((r1.x(a=1) - 'role') * r2.y(b=2)) == \
         "r1 < r1.x(a=1), r2.y(b=2):(role=r1) > r2"
     assert repr(r1.x(a=1) * ('role' - r2.y(b=2))) == \
-        "r2 < r1.y(b=2), r2.x(a=1):(role=r1) > r1"
+        "r1 < r1.x(a=1):(role=r2), r2.y(b=2) > r2"
 
 
 def test_double_cast(e1):
@@ -203,9 +203,9 @@ def test_refs():
 
     assert repr((x := E().x(attr1=10)) >> E().y >> x(attr2=20)) == (
         'e1 < '
+        'e1.x(attr1=10, attr2=20), '
         'e2.y, '
         'r1:(source=e1, target=e2), '
-        'e1.x(attr1=10, attr2=20), '
         'r2:(source=e2, target=e1) '
         '> e1'
     )
@@ -213,9 +213,9 @@ def test_refs():
 
     assert repr((x := E().x(attr1=10)) >> E().y >> x(attr1=20)) == (
         'e1 < '
+        'e1.x(attr1=20), '
         'e2.y, '
         'r1:(source=e1, target=e2), '
-        'e1.x(attr1=20), '
         'r2:(source=e2, target=e1) '
         '> e1'
     )
@@ -231,9 +231,31 @@ def test_complex():
         R().ll_state_transition >> a
     ) == (
         "e1 < "
+        "e1.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
         "e2.ll_state.Standby(comment='No transmit/receive'), "
         "r1.ll_state_transition:(source=e1, target=e2), "
-        "e1.ll_state.Advertising(comment='Device is an \"advertiser\"'), "
         "r2.ll_state_transition:(source=e2, target=e1) "
         "> e1"
+    )
+
+
+def test_multidigit_ids():
+    gp = E()
+    for _ in range(9):
+        gp >>= E()
+    gp >>= gp
+    assert repr(gp) == (
+        'e1 < '
+        'e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, '
+        'r1:(source=e1, target=e2), '
+        'r2:(source=e2, target=e3), '
+        'r3:(source=e3, target=e4), '
+        'r4:(source=e4, target=e5), '
+        'r5:(source=e5, target=e6), '
+        'r6:(source=e6, target=e7), '
+        'r7:(source=e7, target=e8), '
+        'r8:(source=e8, target=e9), '
+        'r9:(source=e9, target=e10), '
+        'r10:(source=e10, target=e1) '
+        '> e10'
     )

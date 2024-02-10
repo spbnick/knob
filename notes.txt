@@ -1683,3 +1683,21 @@ application. And let's rename "creation" to "mark" (?) E.g.:
 ---
 TODO: Decide and implement a consistent approach WRT making a new instance
       with the result or updating this instance. Likely support both.
+---
+So, we don't want the elements with the same ID to have the same hash, or
+compare equally, and instead we're going to keep a map of IDs and elements
+inside the GraphPattern.
+
+We would also make all element references through IDs. I.e. in relations and
+roles. The problem we might have is doing operations and accessing elements
+indirectly this way.
+
+The benefit is that we won't need to update the references when we update
+the elements.
+
+We can also just pass the element into with_replaced_*.
+
+However, this also means, that we can't just pass relations alone, with
+actor elements implicitly referenced. However, we don't really need that,
+we're always operating on GraphPatterns in the knowledge module. Let's try
+that!
