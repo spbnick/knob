@@ -10,6 +10,7 @@ import graphviz  # type: ignore
 # Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal
 # We need them, pylint: disable=fixme
+# We like our "id", pylint: disable=redefined-builtin
 
 
 def _print_stack_indented(*args, **kwargs):
@@ -163,11 +164,33 @@ class Graph:
         return self.nodes == other.nodes and self.edges == other.edges
 
     def __repr__(self):
-        connected_nodes = {e.source for e in self.edges} | \
-            {e.target for e in self.edges}
+        def format_attrs(attrs: dict[str, Union[str, int]]):
+            if any(not k.isidentifier() for k in attrs):
+                return "{" + ", ".join(
+                    f"{k!r}: {v!r}" for k, v in attrs.items()
+                ) + "}"
+            if attrs:
+                return "(" + ", ".join(
+                    f"{k}={v!r}" for k, v in attrs.items()
+                ) + ")"
+            return ""
+
+        # A map of nodes and their representations
+        nodes = {
+            node: (f"n{i + 1}", format_attrs(node.attrs))
+            for i, node in enumerate(sorted(self.nodes, key=lambda n: n.id))
+        }
+        # A map of edges and their representations
+        edges = {
+            edge: (
+                f"e{i + 1}"
+                f"<{nodes[edge.source][0]}, {nodes[edge.target][0]}>"
+                f"{format_attrs(edge.attrs)}",
+            )
+            for i, edge in enumerate(sorted(self.edges, key=lambda e: e.id))
+        }
         return "{" + ", ".join(
-            [repr(e) for e in self.edges] +
-            [repr(n) for n in (self.nodes - connected_nodes)]
+            map("".join, list(nodes.values()) + list(edges.values()))
         ) + "}"
 
     def __copy__(self):
@@ -281,6 +304,21 @@ class Graph:
         Returns:
             The rendered Graphviz source code.
         """
+        # A map of nodes and their graphviz IDs
+        nodes = {
+            node: str(i + 1)
+            for i, node in enumerate(sorted(self.nodes, key=lambda n: n.id))
+        }
+
+        # A map of edges and their graphviz IDs
+        edges = {
+            edge: str(i + 1)
+            for i, edge in enumerate(sorted(self.edges, key=lambda n: n.id))
+        }
+
+        # A map of elements and their graphviz IDs
+        elements = nodes | edges
+
         def trim(v: Union[str, int]):
             """Trim a value to a certain maximum length, if necessary"""
             return v[:61] + "..." if isinstance(v, str) and len(v) > 64 else v
@@ -293,26 +331,20 @@ class Graph:
                 else repr(v)
             )
 
-        def format_label(element: Element):
+        def format_label(element: Node | Edge):
             """Format a label for a graphviz element"""
-            return "\n".join(
-                [str(element.id)] +
+            return "\\n".join(
+                [elements[element]] +
                 [f"{quote(n)}={quote(trim(v))}"
                  for n, v in element.attrs.items()]
             )
 
-        graph = graphviz.Digraph()
-        for node in self.nodes:
-            graph.node(
-                str(id(node)),
-                label=format_label(node),
-                _attributes=dict(shape="box")
-            )
+        graph = graphviz.Digraph(node_attr=dict(shape="box"))
+        for node, id in nodes.items():
+            graph.node(id, label=format_label(node))
         for edge in self.edges:
-            graph.edge(
-                str(id(edge.source)), str(id(edge.target)),
-                label=format_label(edge)
-            )
+            graph.edge(nodes[edge.source], nodes[edge.target],
+                       label=format_label(edge))
         return graph.source
 
     def get_incident_edges(self, node: Node) -> Set[Edge]:
