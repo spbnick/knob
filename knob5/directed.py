@@ -251,7 +251,7 @@ class Graph:
                 edge.source in self.nodes and
                 edge.target in self.nodes
                 for edge in edges
-            )
+            ), f"Edges {edges} reference nodes not in {nodes}"
             self.edges |= edges
         return self
 
