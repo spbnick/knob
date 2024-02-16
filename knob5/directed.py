@@ -184,7 +184,7 @@ class Graph:
         edges = {
             edge: (
                 f"e{i + 1}"
-                f"<{nodes[edge.source][0]}, {nodes[edge.target][0]}>"
+                f"[{nodes[edge.source][0]}->{nodes[edge.target][0]}]"
                 f"{format_attrs(edge.attrs)}",
             )
             for i, edge in enumerate(sorted(self.edges, key=lambda e: e.id))
