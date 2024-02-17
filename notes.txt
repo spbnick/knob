@@ -1680,6 +1680,9 @@ application. And let's rename "creation" to "mark" (?) E.g.:
     # Match the complete pattern and remove the marked parts
     KG ^= e(x=1) >> +e(x=2)
 
+    # Produce a graph matching the complete pattern, marked or not
+    KG &= e(x=1) >> +e(x=2)
+
 ---
 TODO: Decide and implement a consistent approach WRT making a new instance
       with the result or updating this instance. Likely support both.
@@ -1701,3 +1704,20 @@ However, this also means, that we can't just pass relations alone, with
 actor elements implicitly referenced. However, we don't really need that,
 we're always operating on GraphPatterns in the knowledge module. Let's try
 that!
+---
+TODO: How do we mark a role for addition/removal using knowledge graph
+      patterns?
+
+We should be able to mark a particular role. So that e.g. we could say match a
+relation with these roles, and an element, and add another role to it pointing
+to this element. Without creating either the element or the relation.
+
+Looks like we would have to separate roles into their own objects in the
+patterns.
+
+So perhaps we can devolve the Entities/Relations into Elements, and add Roles
+to that. This would actually directly correspond to what we have in the
+directed graph.
+
+Then we lose the distinction between entities and relations. OTOH, we won't
+have to have a separate "directed" and "knowledge" graphs.
