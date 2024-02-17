@@ -43,8 +43,12 @@ class Element:
     def __hash__(self):
         return id(self)
 
+    def ref_repr(self):
+        """Format a reference representation of the element"""
+        return f"#{self.id}"
+
     def __repr__(self):
-        repr_str = str(self.id)
+        repr_str = self.ref_repr()
         if self.attrs:
             repr_str += "(" + ", ".join(
                 (k if k.isidentifier() else repr(k)) + "=" + repr(v)
@@ -73,6 +77,10 @@ class Node(Element):
 
     def __copy__(self):
         return Node(**self.attrs)
+
+    def ref_repr(self):
+        """Format a reference representation of the node"""
+        return f"n{super().ref_repr()}"
 
 
 class Edge(Element):
@@ -123,12 +131,13 @@ class Edge(Element):
         assert node in (self.source, self.target)
         return node is self.target
 
+    def ref_repr(self):
+        """Format a reference representation of the edge"""
+        return f"e{super().ref_repr()}"
+
     def __repr__(self):
-        return (
-            repr(self.source) +
-            " --" + super().__repr__() + "-> " +
-            repr(self.target)
-        )
+        return f"{super()!r}" \
+            f"[{self.source.ref_repr()}, {self.target.ref_repr()}]"
 
 
 class Graph:
