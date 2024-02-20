@@ -47,14 +47,20 @@ class Element:
         """Format a reference representation of the element"""
         return f"#{self.id}"
 
-    def __repr__(self):
-        repr_str = self.ref_repr()
+    def attrs_repr(self):
+        """Format a representation of attributes"""
+        if any(not k.isidentifier() for k in self.attrs):
+            return "{" + ", ".join(
+                f"{k!r}: {v!r}" for k, v in self.attrs.items()
+            ) + "}"
         if self.attrs:
-            repr_str += "(" + ", ".join(
-                (k if k.isidentifier() else repr(k)) + "=" + repr(v)
-                for k, v in self.attrs.items()
+            return "(" + ", ".join(
+                f"{k}={v!r}" for k, v in self.attrs.items()
             ) + ")"
-        return repr_str
+        return ""
+
+    def __repr__(self):
+        return self.ref_repr() + self.attrs_repr()
 
     def matches(self, element: "Element"):
         """
@@ -173,20 +179,9 @@ class Graph:
         return self.nodes == other.nodes and self.edges == other.edges
 
     def __repr__(self):
-        def format_attrs(attrs: dict[str, Union[str, int]]):
-            if any(not k.isidentifier() for k in attrs):
-                return "{" + ", ".join(
-                    f"{k!r}: {v!r}" for k, v in attrs.items()
-                ) + "}"
-            if attrs:
-                return "(" + ", ".join(
-                    f"{k}={v!r}" for k, v in attrs.items()
-                ) + ")"
-            return ""
-
         # A map of nodes and their representations
         nodes = {
-            node: (f"n{i + 1}", format_attrs(node.attrs))
+            node: (f"n{i + 1}", node.attrs_repr())
             for i, node in enumerate(sorted(self.nodes, key=lambda n: n.id))
         }
         # A map of edges and their representations
@@ -194,7 +189,7 @@ class Graph:
             edge: (
                 f"e{i + 1}"
                 f"[{nodes[edge.source][0]}->{nodes[edge.target][0]}]"
-                f"{format_attrs(edge.attrs)}",
+                f"{edge.attrs_repr()}",
             )
             for i, edge in enumerate(sorted(self.edges, key=lambda e: e.id))
         }
