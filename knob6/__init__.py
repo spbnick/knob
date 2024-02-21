@@ -18,13 +18,17 @@ def _print_stack_indented(*args, **kwargs):
     print(indent[:-1], *args, **kwargs)
 
 
+# Accepted attribute value types
+AttrTypes = Union[str, int]
+
+
 class Element:
     """A graph's element (node/edge)"""
 
     # The next ID to assign to a created element
     __NEXT_ID = 0
 
-    def __init__(self, **attrs: Union[str, int]):
+    def __init__(self, **attrs: AttrTypes):
         """
         Initialize a graph element.
 
@@ -92,7 +96,7 @@ class Node(Element):
 class Edge(Element):
     """A directed graph's edge"""
 
-    def __init__(self, source: Node, target: Node, **attrs: Union[str, int]):
+    def __init__(self, source: Node, target: Node, **attrs: AttrTypes):
         """
         Initialize a graph's edge.
 
@@ -323,11 +327,11 @@ class Graph:
         # A map of elements and their graphviz IDs
         elements = nodes | edges
 
-        def trim(v: Union[str, int]):
+        def trim(v: AttrTypes):
             """Trim a value to a certain maximum length, if necessary"""
             return v[:61] + "..." if isinstance(v, str) and len(v) > 64 else v
 
-        def quote(v: Union[str, int]):
+        def quote(v: AttrTypes):
             """Quote a value, if necessary"""
             return (
                 str(v)
