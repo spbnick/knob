@@ -1721,3 +1721,75 @@ directed graph.
 
 Then we lose the distinction between entities and relations. OTOH, we won't
 have to have a separate "directed" and "knowledge" graphs.
+---
+n1 - e1 * n2
+
+n1 >> n2 >> n3
+
+n1 >> r2 >> n3
+
+
+n1 >> n2 == n1->n2 or n1<-source-n3-target->n2 ?
+
+
+So maybe the point of the patterns is to make it easier to introduce the
+"relation" nodes?
+
+So we could have an operator creating a relation and implicit roles?
+
+n1 >> n2 >> n3 == n1<-source-n2-target->n3 ?
+
+Could we perhaps derive both EntityPattern and RelationPattern from
+NodePattern? But have them behave differently with operators?
+
+So that:
+
+e1 >> r1 >> e2 == e1<-source-r1-target->e2
+
+But:
+
+e1 >> e2 >> e3 == e1<-source-r1-target->e2<-source-r2-target->e3
+
+And perhaps RolePattern can be derived from NodePattern?
+
+Or perhaps those could be derived from GraphPattern instead, and have
+operations overriden?
+
+Ah, no, because the graph patterns can have different elements on the left and
+on the right. So we need to do it with different pattern classes.
+
+So on the side/edge of a graph pattern we can have:
+    - entity
+    - relation
+    - role pointing at entity/relation, that is:
+        - an edge pattern with target set to the entity/relation, but source unset.
+    - role attached to a relation, that is:
+        - an edge pattern with source set to the relation and the target unset.
+    - unattached role, that is:
+        - an edge pattern without either source or target set
+
+
+We should not have a role attached to both a relation and an entity at an edge
+of a graph pattern, we should just have the corresponding endpoint instead.
+
+Hmm, isn't a relation a type of entity? Yes.
+Whereas an entity can only have role edges pointing *at* it, relations can
+have both incoming and outgoing role edges.
+
+Ah, wait, doesn't that mean that *entity* is a subtype of a relation?
+Hmm. A restriction of a wider type? No, relation is a subtype of entity,
+because relation has properties of entity, but not the other way around.
+
+---
+IDs:
+bit 0   1   2   3
+    -------------
+    x   x   x   x   element
+    0   x   x   x   edge(element)
+    0   x   x   x   role(edge)
+    1   x   x   x   node(element)
+    1   0   x   x   entity(node)
+    1   1   x   x   relation(node)
+
+TODO: Check that relation role names are unique, in graph patterns.
+    - or maybe not?
