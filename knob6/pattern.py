@@ -87,7 +87,7 @@ class Element:
     def ref_repr(cls, id: int):
         """Format a reference representation of a pattern ID"""
         assert cls.is_valid_id(id)
-        return f"Element#{id}"
+        return f"{cls.__name__}#{id}"
 
     def __repr__(self):
         return self.ref_repr(self.id) + self.attrs_repr()
@@ -122,12 +122,6 @@ class Node(Element):
             Node.__NEXT_ID = max(id, Node.__NEXT_ID)
         Node.__NEXT_ID += 2
         super().__init__(id, attrs)
-
-    @classmethod
-    def ref_repr(cls, id: int):
-        """Format a reference representation of a pattern ID"""
-        assert cls.is_valid_id(id)
-        return f"Node#{id}"
 
     def __or__(self, other) -> Self:
         """Merge two instances of the pattern together"""
@@ -252,12 +246,6 @@ class Edge(Element):
         self.source = source
         self.target = target
 
-    @classmethod
-    def ref_repr(cls, id: int):
-        """Format a reference representation of a pattern ID"""
-        assert cls.is_valid_id(id)
-        return f"Edge#{id}"
-
     def __repr__(self):
         return super().__repr__() + (
             "[" +
@@ -336,7 +324,7 @@ class Function(Edge):
             "[" +
             (Relation.ref_repr(self.source) if self.source else "") +
             "->" +
-            (Entity.ref_repr(self.target) if self.target else "") +
+            (Node.ref_repr(self.target) if self.target else "") +
             "]"
         )
 
