@@ -22,6 +22,19 @@ def _print_stack_indented(*args, **kwargs):
 AttrTypes = Union[str, int]
 
 
+def attrs_repr(attrs: dict[str, AttrTypes]):
+    """Format a (preferably compact) representation of attributes"""
+    if any(not k.isidentifier() for k in attrs):
+        return "{" + ", ".join(
+            f"{k!r}: {v!r}" for k, v in attrs.items()
+        ) + "}"
+    if attrs:
+        return "(" + ", ".join(
+            f"{k}={v!r}" for k, v in attrs.items()
+        ) + ")"
+    return ""
+
+
 class Element:
     """A graph's element (node/edge)"""
 
@@ -52,16 +65,8 @@ class Element:
         return f"#{self.id}"
 
     def attrs_repr(self):
-        """Format a representation of attributes"""
-        if any(not k.isidentifier() for k in self.attrs):
-            return "{" + ", ".join(
-                f"{k!r}: {v!r}" for k, v in self.attrs.items()
-            ) + "}"
-        if self.attrs:
-            return "(" + ", ".join(
-                f"{k}={v!r}" for k, v in self.attrs.items()
-            ) + ")"
-        return ""
+        """Format a (preferably compact) representation of attributes"""
+        return attrs_repr(self.attrs)
 
     def __repr__(self):
         return self.ref_repr() + self.attrs_repr()
