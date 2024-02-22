@@ -4,35 +4,13 @@ KNOB - Knowledge builder
 
 from typing import cast, Final, Generator, Dict, Set, Union, Optional
 from copy import copy
-import inspect
 import graphviz  # type: ignore
+from knob6.misc import AttrTypes, attrs_repr
 
 # Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal
 # We need them, pylint: disable=fixme
 # We like our "id", pylint: disable=redefined-builtin
-
-
-def _print_stack_indented(*args, **kwargs):
-    indent = '    ' * (len(inspect.stack()) - 1)
-    print(indent[:-1], *args, **kwargs)
-
-
-# Accepted attribute value types
-AttrTypes = Union[str, int]
-
-
-def attrs_repr(attrs: dict[str, AttrTypes]):
-    """Format a (preferably compact) representation of attributes"""
-    if any(not k.isidentifier() for k in attrs):
-        return "{" + ", ".join(
-            f"{k!r}: {v!r}" for k, v in attrs.items()
-        ) + "}"
-    if attrs:
-        return "(" + ", ".join(
-            f"{k}={v!r}" for k, v in attrs.items()
-        ) + ")"
-    return ""
 
 
 class Element:
@@ -435,14 +413,14 @@ class Graph:
             )
             assert matches.get(self_node) is other_node
 
-            # _print_stack_indented(f"match_components"
-            #                       f"{(matches, self_node, other_node)}")
+            # print_stack_indented(f"match_components"
+            #                      f"{(matches, self_node, other_node)}")
 
             rem_self_edges = self.get_incident_edges(self_node) - self_matches
 
             # If there are no edges left to match
             if not rem_self_edges:
-                # _print_stack_indented(f"<- {matches}")
+                # print_stack_indented(f"<- {matches}")
                 yield matches
                 return
 
@@ -526,9 +504,9 @@ class Graph:
                 for o in other_matches if isinstance(o, Edge)
             )
 
-            # _print_stack_indented(f"match_subgraphs({matches})")
+            # print_stack_indented(f"match_subgraphs({matches})")
             if self_matches == (self.nodes | self.edges):
-                # _print_stack_indented(f"<- {matches}")
+                # print_stack_indented(f"<- {matches}")
                 yield matches
                 return
             rem_self_nodes = self.nodes - self_matches
@@ -546,13 +524,13 @@ class Graph:
                         # Match the remaining components
                         yield from match_subgraphs(new_matches)
 
-        # _print_stack_indented(f"detailed_match{(self, other)}")
+        # print_stack_indented(f"detailed_match{(self, other)}")
         # TODO: Something smarter than this
         matches_set = set()
         for matches in match_subgraphs({}):
             frozen_matches = frozenset(matches.items())
             if frozen_matches not in matches_set:
-                # _print_stack_indented(f"<- {matches}")
+                # print_stack_indented(f"<- {matches}")
                 yield matches
                 matches_set.add(frozen_matches)
 
@@ -566,10 +544,10 @@ class Graph:
         Yields:
             Subgraphs of the other graph that match this graph.
         """
-        # _print_stack_indented(f"match{(self, other)}")
+        # print_stack_indented(f"match{(self, other)}")
         for matches in self.detailed_match(other):
             g = Graph(*matches.values())
-            # _print_stack_indented(f"<- {g}")
+            # print_stack_indented(f"<- {g}")
             yield g
 
     def matches(self, other: "Graph") -> bool:
