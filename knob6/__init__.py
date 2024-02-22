@@ -7,7 +7,6 @@ from copy import copy
 import graphviz  # type: ignore
 from knob6.misc import AttrTypes, attrs_repr
 
-# Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal
 # We need them, pylint: disable=fixme
 # We like our "id", pylint: disable=redefined-builtin
