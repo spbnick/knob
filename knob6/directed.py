@@ -2,7 +2,7 @@
 KNOB - The directed graph (pattern)
 """
 
-from typing import cast, Final, Generator, Dict, Set, Union, Optional
+from typing import cast, Final, Generator, Dict, Set, Optional
 from copy import copy
 import graphviz  # type: ignore
 from knob6.misc import AttrTypes, attrs_repr
@@ -132,10 +132,15 @@ class Edge(Element):
             f"[{self.source.ref_repr()}, {self.target.ref_repr()}]"
 
 
+# Element types operated by the graph
+ELEMENTS = (Node, Edge)
+Elements = Node | Edge
+
+
 class Graph:
     """A directed graph"""
 
-    def __init__(self, *elements: Union[Node, Edge],
+    def __init__(self, *elements: Elements,
                  nodes: Optional[Set[Node]] = None,
                  edges: Optional[Set[Edge]] = None):
         """
@@ -199,7 +204,7 @@ class Graph:
         self.edges |= other.edges
         return self
 
-    def add(self, *elements: Union[Node, Edge],
+    def add(self, *elements: Elements,
             nodes: Optional[Set[Node]] = None,
             edges: Optional[Set[Edge]] = None):
         """
@@ -220,7 +225,7 @@ class Graph:
             The modified graph (self).
         """
         assert isinstance(elements, tuple)
-        assert all(isinstance(element, (Node, Edge)) for element in elements)
+        assert all(isinstance(element, ELEMENTS) for element in elements)
         assert nodes is None or isinstance(nodes, set) and all(
             isinstance(node, Node) for node in nodes
         )
@@ -245,7 +250,7 @@ class Graph:
             self.edges |= edges
         return self
 
-    def remove(self, *elements: Union[Node, Edge],
+    def remove(self, *elements: Elements,
                nodes: Optional[Set[Node]] = None,
                edges: Optional[Set[Edge]] = None):
         """
@@ -265,7 +270,7 @@ class Graph:
             The modified graph (self).
         """
         assert isinstance(elements, tuple)
-        assert all(isinstance(element, (Node, Edge)) for element in elements)
+        assert all(isinstance(element, ELEMENTS) for element in elements)
         assert nodes is None or isinstance(nodes, set) and all(
             isinstance(node, Node) for node in nodes
         )
@@ -350,7 +355,7 @@ class Graph:
         return set(filter(lambda e: node in (e.source, e.target), self.edges))
 
     def detailed_match(self, other: "Graph") -> Generator[
-        Dict[Union[Node, Edge], Union[Node, Edge]], None, None
+        Dict[Elements, Elements], None, None
     ]:
         """
         Find all matches of this graph, as a pattern, against another graph.
@@ -364,11 +369,11 @@ class Graph:
             matches completely.
         """
         def match_components(
-            matches: Dict[Union[Node, Edge], Union[Node, Edge]],
+            matches: Dict[Elements, Elements],
             self_node: Node,
             other_node: Node
         ) -> Generator[
-            Dict[Union[Node, Edge], Union[Node, Edge]], None, None
+            Dict[Elements, Elements], None, None
         ]:
             """
             Find all subgraphs of a component of the other graph fully
@@ -470,9 +475,9 @@ class Graph:
                         )
 
         def match_subgraphs(
-            matches: Dict[Union[Node, Edge], Union[Node, Edge]]
+            matches: Dict[Elements, Elements]
         ) -> Generator[
-            Dict[Union[Node, Edge], Union[Node, Edge]], None, None
+            Dict[Elements, Elements], None, None
         ]:
             """
             Match this graph, used as a pattern, to subgraphs in the other.
@@ -561,7 +566,7 @@ class Graph:
         """
         return bool(next(self.detailed_match(other), False))
 
-    def graft(self, other: "Graph", *elements: Union[Node, Edge]):
+    def graft(self, other: "Graph", *elements: Elements):
         """
         Graft another graph onto this one, adding specified elements from the
         other graph, connecting the nodes matching the rest.
@@ -614,7 +619,7 @@ class Graph:
         return None if edges_to_add is None \
             else copy(self).add(nodes=nodes, edges=edges_to_add)
 
-    def prune(self, other: "Graph", *elements: Union[Node, Edge]):
+    def prune(self, other: "Graph", *elements: Elements):
         """
         Prune another graph from this one by matching, and removing the
         elements matching the specified ones.
