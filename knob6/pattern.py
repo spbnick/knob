@@ -356,7 +356,7 @@ class Graph:
 
     def __init__(self,
                  elements: dict[int, GraphElements],
-                 marks: set[int],
+                 marks: dict[int, bool],
                  left: int, right: int):
         """
         Initialize the graph pattern.
@@ -365,8 +365,12 @@ class Graph:
             elements:   A dictionary of element IDs and corresponding element
                         (entity/relation/function) patterns. The pattern IDs
                         must match corresponding dictionary keys.
-            marks:      A set of IDs of marked elements. Must be a subset of
-                        "elements" keys.
+            marks:      A dictionary of elements and their marked status:
+                        either False, or True. Elements without their ID in
+                        this dictionary are considered unmarked when the
+                        pattern is applied, and unset, when the pattern is
+                        merged with another. All keys in this dictionary must
+                        exist in "elements".
             left:       The ID of the left-side element pattern. To use when
                         using the graph pattern on the right side of an
                         operator. The ID must be in "elements".
@@ -385,8 +389,9 @@ class Graph:
             id == e.id
             for id, e in elements.items()
         )
-        assert isinstance(marks, set)
-        assert marks <= set(elements)
+        assert isinstance(marks, dict)
+        assert set(marks) <= set(elements)
+        assert all(isinstance(m, bool) for m in marks.values())
         assert all(
             (not e.source or e.source in elements) and
             (not e.target or e.target in elements)
@@ -441,7 +446,7 @@ class Graph:
             if element.source and element.target and \
                "_type" in element.attrs:
                 relation_functions[element.source].append((
-                    ("", "+")[id in self.marks],
+                    ("", "+")[self.marks.get(id, False)],
                     element.attrs["_type"],
                     element.target
                 ))
@@ -479,7 +484,7 @@ class Graph:
 
         # Put everything together
         return f"{element_reprs[self.left][0]} < " + ", ".join(
-            ("", "+")[id in self.marks] + "".join(element_reprs[id])
+            ("", "+")[self.marks.get(id, False)] + "".join(element_reprs[id])
             for id in (entity_ids + relation_ids + function_ids)
         ) + f" > {element_reprs[self.right][0]}"
 
@@ -504,13 +509,22 @@ class Graph:
         elements = self.elements.copy()
         for id, element in other.elements.items():
             elements[id] = elements.get(id, element) | element
-        return Graph(elements, other.marks, self.left, other.right)
+        marks = dict(
+            filter(
+                lambda id_mark: id_mark[1] is not None,
+                map(
+                    lambda id: (id, other.marks.get(id, self.marks.get(id))),
+                    set(self.marks) | set(other.marks)
+                )
+            )
+        )
+        return Graph(elements, marks, self.left, other.right)
 
     def __pos__(self):
         """Mark all elements in the graph pattern"""
         return Graph(
             self.elements,
-            set(self.elements),
+            {id: True for id in self.elements},
             self.left,
             self.right
         )
@@ -519,7 +533,7 @@ class Graph:
         """Unmark all elements in the graph pattern"""
         return Graph(
             self.elements,
-            set(),
+            {id: False for id in self.elements},
             self.left,
             self.right
         )
@@ -721,7 +735,7 @@ class EntityGraph(Graph):
             attrs:  The attribute dictionary.
         """
         ep = Entity(0, attrs)
-        super().__init__({ep.id: ep}, set(), ep.id, ep.id)
+        super().__init__({ep.id: ep}, {}, ep.id, ep.id)
 
 
 class RelationGraph(Graph):
@@ -735,7 +749,7 @@ class RelationGraph(Graph):
             attrs:  The relation's attribute dictionary.
         """
         rp = Relation(0, attrs)
-        super().__init__({rp.id: rp}, set(), rp.id, rp.id)
+        super().__init__({rp.id: rp}, {}, rp.id, rp.id)
 
 
 class FunctionGraph(Graph):
@@ -749,4 +763,4 @@ class FunctionGraph(Graph):
             type:   The function's type name, or None for none.
         """
         fp = Function(0, {} if type is None else dict(_type=type))
-        super().__init__({fp.id: fp}, set(), fp.id, fp.id)
+        super().__init__({fp.id: fp}, {}, fp.id, fp.id)
