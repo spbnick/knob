@@ -89,10 +89,10 @@ def test_element_getitem_mark(e1, r1):
 
 
 def test_element_func_name_cast(e1, r1):
-    assert repr(e1 - 'func') == "e1 < e1 > e1-'func'"
-    assert repr('func' - e1) == "'func'-e1 < e1 > e1"
-    assert repr(r1 - 'func') == "r1 < r1 > r1-'func'"
-    assert repr('func' - r1) == "'func'-r1 < r1 > r1"
+    assert repr(e1 - 'func') == "e1 < e1, f1.func[->e1] > f1"
+    assert repr('func' - e1) == "f1 < e1, f1.func[->e1] > e1"
+    assert repr(r1 - 'func') == "r1 < r1, f1.func[->r1] > f1"
+    assert repr('func' - r1) == "f1 < r1, f1.func[->r1] > r1"
 
 
 def test_element_func_name_open(e1, r1):
@@ -100,8 +100,8 @@ def test_element_func_name_open(e1, r1):
         _ = e1 * 'func'
     with pytest.raises(ValueError):
         _ = 'func' * e1
-    assert repr(r1 * 'func') == "r1 < r1 > r1*'func'"
-    assert repr('func' * r1) == "'func'*r1 < r1 > r1"
+    assert repr(r1 * 'func') == "r1 < r1, f1.func[r1->] > f1"
+    assert repr('func' * r1) == "f1 < r1, f1.func[r1->] > r1"
 
 
 def test_element_opening_cast(e1, r1):

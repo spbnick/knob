@@ -2,7 +2,7 @@
 KNOB - Knowledge graph patterns
 """
 
-from typing import Tuple, Self
+from typing import Optional, Tuple, Self
 from knob6.misc import AttrTypes, attrs_repr
 
 # Calm down, pylint: disable=too-few-public-methods
@@ -303,12 +303,13 @@ class Function(Edge):
                     Must be even and positive.
                     Zero to assign next available.
             attrs:  The attribute dictionary.
-                    Must contain only the "_type" string attribute.
+                    Can only be empty or contain the "_type" string attribute.
             source: The ID of the source relation, or zero if none.
             target: The ID of the target node, or zero if none.
         """
         assert isinstance(attrs, dict)
-        assert set(attrs) == {"_type"} and isinstance(attrs["_type"], str)
+        assert not attrs or \
+            set(attrs) == {"_type"} and isinstance(attrs["_type"], str)
         assert source == 0 or Relation.is_valid_id(source)
         assert target == 0 or Node.is_valid_id(target)
         super().__init__(id, attrs, source, target)
@@ -335,12 +336,14 @@ class Function(Edge):
 
         Args:
             attrs:  The attribute dictionary to update with.
+                    Can only be empty or contain the "_type" string attribute.
 
         Returns:
             The self and the updated pattern.
         """
         assert isinstance(attrs, dict)
-        assert set(attrs) == {"_type"} and isinstance(attrs["_type"], str)
+        assert not attrs or \
+            set(attrs) == {"_type"} and isinstance(attrs["_type"], str)
         return super().with_updated_attrs(attrs)
 
 
@@ -405,29 +408,54 @@ class Graph:
         # A list of relation IDs
         relation_ids = []
 
-        # A dictionary of node IDs and repr (signature, body) tuples
-        node_reprs = {}
+        # A list of incomplete function IDs
+        function_ids = []
 
-        # Generate graph pattern-unique entity and relation signatures
+        # A dictionary of element IDs and repr (signature, body) tuples
+        element_reprs = {}
+
+        # Generate graph pattern-unique element signatures
         for id, element in self.elements.items():
             if isinstance(element, Entity):
                 entity_ids.append(id)
-                node_reprs[id] = (f"e{len(entity_ids)}",)
+                element_reprs[id] = (f"e{len(entity_ids)}",)
             elif isinstance(element, Relation):
                 relation_ids.append(id)
-                node_reprs[id] = (f"r{len(relation_ids)}",)
+                element_reprs[id] = (f"r{len(relation_ids)}",)
+            elif isinstance(element, Function):
+                # Skip complete functions
+                if element.source and element.target and \
+                   "_type" in element.attrs:
+                    continue
+                function_ids.append(id)
+                element_reprs[id] = (f"f{len(function_ids)}",)
 
         # A dictionary of IDs of relations and lists of tuples of their
-        # function names and corresponding actor node IDs.
+        # mark characters, function names, and corresponding actor node IDs.
         relation_functions = {id: [] for id in relation_ids}
 
-        # Collect functions for relations
+        # Collect both complete and incomplete functions (edges)
         for id, element in self.elements.items():
-            # Skip anything but complete function patterns
-            if isinstance(element, Function) and \
-               element.source and element.target:
-                relation_functions[element.source].append(
-                    (element.attrs["_type"], element.target)
+            if not isinstance(element, Function):
+                continue
+            # If the function is complete
+            if element.source and element.target and \
+               "_type" in element.attrs:
+                relation_functions[element.source].append((
+                    ("", "+")[id in self.marks],
+                    element.attrs["_type"],
+                    element.target
+                ))
+            else:
+                element_reprs[id] += (
+                    element.attrs_repr() +
+                    (
+                        "[" +
+                        element_reprs.get(element.source, ("", ))[0] +
+                        "->" +
+                        element_reprs.get(element.target, ("", ))[0] +
+                        "]"
+                    ) if element.source or element.target else "",
                 )
 
         # Generate entity and relation bodies
@@ -436,49 +464,24 @@ class Graph:
                 continue
             body = element.attrs_repr()
             if isinstance(element, Relation):
-                functions = sorted(relation_functions[id], key=lambda f: f[0])
-                if any(not n.isidentifier() for n, _ in functions):
+                functions = sorted(relation_functions[id])
+                if any(not (n or "").isidentifier() for _, n, _ in functions):
                     body += ":{" + ", ".join(
-                        repr(n) + ": " + node_reprs[a_id][0]
-                        for n, a_id in functions
+                        f"{m}{n!r}: {element_reprs[a_id][0]}"
+                        for m, n, a_id in functions
                     ) + "}"
                 elif functions:
                     body += ":(" + ", ".join(
-                        n + "=" + node_reprs[a_id][0]
-                        for n, a_id in functions
+                        f"{m}{n}={element_reprs[a_id][0]}"
+                        for m, n, a_id in functions
                     ) + ")"
-            node_reprs[id] += (body,)
-
-        # Format left element
-        element = self.elements[self.left]
-        if isinstance(element, Function):
-            assert not element.source or not element.target
-            left = repr(element.attrs["_type"])
-            if element.source:
-                left += f"*{node_reprs[element.source][0]}"
-            elif element.target:
-                left += f"-{node_reprs[element.target][0]}"
-        else:
-            left = node_reprs[self.left][0]
-
-        # Format right element
-        element = self.elements[self.right]
-        if isinstance(element, Function):
-            assert not element.source or not element.target
-            right = ""
-            if element.source:
-                right += f"{node_reprs[element.source][0]}*"
-            elif element.target:
-                right += f"{node_reprs[element.target][0]}-"
-            right += repr(element.attrs["_type"])
-        else:
-            right = node_reprs[self.right][0]
+            element_reprs[id] += (body,)
 
         # Put everything together
-        return f"{left} < " + ", ".join(
-            ("", "+")[id in self.marks] + "".join(node_reprs[id])
-            for id in (entity_ids + relation_ids)
-        ) + f" > {right}"
+        return f"{element_reprs[self.left][0]} < " + ", ".join(
+            ("", "+")[id in self.marks] + "".join(element_reprs[id])
+            for id in (entity_ids + relation_ids + function_ids)
+        ) + f" > {element_reprs[self.right][0]}"
 
     def with_replaced_element(
         self, old: GraphElements, new: GraphElements
@@ -738,12 +741,12 @@ class RelationGraph(Graph):
 class FunctionGraph(Graph):
     """A single-function graph pattern"""
 
-    def __init__(self, type: str):
+    def __init__(self, type: Optional[str] = None):
         """
         Initialize the single-function graph pattern.
 
         Args:
-            attrs:  The function's attribute dictionary.
+            type:   The function's type name, or None for none.
         """
-        fp = Function(0, dict(_type=type))
+        fp = Function(0, {} if type is None else dict(_type=type))
         super().__init__({fp.id: fp}, set(), fp.id, fp.id)
