@@ -88,62 +88,62 @@ def test_element_getitem_mark(e1, r1):
     assert repr(-r1['foo bar']) == "r1 < r1['foo bar'] > r1"
 
 
-def test_element_role_name_cast(e1, r1):
-    assert repr(e1 - 'role') == "e1 < e1 > e1-'role'"
-    assert repr('role' - e1) == "'role'-e1 < e1 > e1"
-    assert repr(r1 - 'role') == "r1 < r1 > r1-'role'"
-    assert repr('role' - r1) == "'role'-r1 < r1 > r1"
+def test_element_func_name_cast(e1, r1):
+    assert repr(e1 - 'func') == "e1 < e1 > e1-'func'"
+    assert repr('func' - e1) == "'func'-e1 < e1 > e1"
+    assert repr(r1 - 'func') == "r1 < r1 > r1-'func'"
+    assert repr('func' - r1) == "'func'-r1 < r1 > r1"
 
 
-def test_element_role_name_open(e1, r1):
+def test_element_func_name_open(e1, r1):
     with pytest.raises(ValueError):
-        _ = e1 * 'role'
+        _ = e1 * 'func'
     with pytest.raises(ValueError):
-        _ = 'role' * e1
-    assert repr(r1 * 'role') == "r1 < r1 > r1*'role'"
-    assert repr('role' * r1) == "'role'*r1 < r1 > r1"
+        _ = 'func' * e1
+    assert repr(r1 * 'func') == "r1 < r1 > r1*'func'"
+    assert repr('func' * r1) == "'func'*r1 < r1 > r1"
 
 
 def test_element_opening_cast(e1, r1):
-    assert repr(e1 - 'role' * r1) == "e1 < e1, r1:(role=e1) > r1"
+    assert repr(e1 - 'func' * r1) == "e1 < e1, r1:(func=e1) > r1"
     assert repr(e1 - 'ro le' * r1) == "e1 < e1, r1:{'ro le': e1} > r1"
-    assert repr(r1 * 'role' - e1) == "r1 < e1, r1:(role=e1) > e1"
+    assert repr(r1 * 'func' - e1) == "r1 < e1, r1:(func=e1) > e1"
     assert repr(r1 * 'ro le' - e1) == "r1 < e1, r1:{'ro le': e1} > e1"
 
 
 def test_element_casting_open(e1, r1, r2):
-    assert repr((e1 - 'role') * r1) == "e1 < e1, r1:(role=e1) > r1"
-    assert repr(r1 * ('role' - e1)) == "r1 < e1, r1:(role=e1) > e1"
+    assert repr((e1 - 'func') * r1) == "e1 < e1, r1:(func=e1) > r1"
+    assert repr(r1 * ('func' - e1)) == "r1 < e1, r1:(func=e1) > e1"
 
     with pytest.raises(ValueError):
-        (r1 - 'role') * e1
+        (r1 - 'func') * e1
     with pytest.raises(ValueError):
-        e1 * ('role' - r1)
+        e1 * ('func' - r1)
     with pytest.raises(ValueError):
-        (e1 - 'role') * e1
+        (e1 - 'func') * e1
     with pytest.raises(ValueError):
-        e1 * ('role' - e1)
+        e1 * ('func' - e1)
 
-    assert repr((r1 - 'role') * r2) == "r1 < r1, r2:(role=r1) > r2"
-    assert repr(r1 * ('role' - r2)) == "r1 < r1:(role=r2), r2 > r2"
+    assert repr((r1 - 'func') * r2) == "r1 < r1, r2:(func=r1) > r2"
+    assert repr(r1 * ('func' - r2)) == "r1 < r1:(func=r2), r2 > r2"
 
-    assert repr((r1.x - 'role') * r2.y) == "r1 < r1.x, r2.y:(role=r1) > r2"
-    assert repr(r1.x * ('role' - r2.y)) == "r1 < r1.x:(role=r2), r2.y > r2"
+    assert repr((r1.x - 'func') * r2.y) == "r1 < r1.x, r2.y:(func=r1) > r2"
+    assert repr(r1.x * ('func' - r2.y)) == "r1 < r1.x:(func=r2), r2.y > r2"
 
-    assert repr((r1.x(a=1) - 'role') * r2.y(b=2)) == \
-        "r1 < r1.x(a=1), r2.y(b=2):(role=r1) > r2"
-    assert repr(r1.x(a=1) * ('role' - r2.y(b=2))) == \
-        "r1 < r1.x(a=1):(role=r2), r2.y(b=2) > r2"
+    assert repr((r1.x(a=1) - 'func') * r2.y(b=2)) == \
+        "r1 < r1.x(a=1), r2.y(b=2):(func=r1) > r2"
+    assert repr(r1.x(a=1) * ('func' - r2.y(b=2))) == \
+        "r1 < r1.x(a=1):(func=r2), r2.y(b=2) > r2"
 
 
 def test_double_cast(e1):
     with pytest.raises(ValueError):
-        e1 - 'role' - e1
+        e1 - 'func' - e1
 
 
 def test_double_open(r1):
     with pytest.raises(ValueError):
-        r1 * 'role' * r1
+        r1 * 'func' * r1
 
 
 def test_element_edge_element(e1, e2, r1):
@@ -155,14 +155,14 @@ def test_element_edge_element(e1, e2, r1):
         "e1 < e1, e2, r1:(source=e2, target=e1) > e2"
 
 
-def test_element_edge_role(e1, r1):
+def test_element_edge_func(e1, r1):
     assert repr(e1 >> r1) == "e1 < e1, r1:(source=e1) > r1"
     assert repr(e1 << r1) == "e1 < e1, r1:(target=e1) > r1"
     assert repr(r1 >> e1) == "r1 < e1, r1:(target=e1) > e1"
     assert repr(r1 << e1) == "r1 < e1, r1:(source=e1) > e1"
 
 
-def test_element_edge_role_edge_element(e1, r1, e2):
+def test_element_edge_func_edge_element(e1, r1, e2):
     assert repr(e1 >> (r1 >> e2)) == \
         "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
     assert repr((e1 >> r1) >> e2) == \
