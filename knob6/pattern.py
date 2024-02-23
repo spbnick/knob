@@ -293,6 +293,15 @@ class Edge(Element):
 class Function(Edge):
     """A function edge pattern"""
 
+    @classmethod
+    def are_attrs_valid(cls, attrs: dict[str, AttrTypes]):
+        """Check if attributes dictionary is valid for a function"""
+        assert isinstance(attrs, dict)
+        return not attrs or (
+            set(attrs) == {"_type"} and
+            isinstance(attrs["_type"], str)
+        )
+
     def __init__(self, id: int, attrs: dict[str, AttrTypes],
                  source: int = 0, target: int = 0):
         """
@@ -308,8 +317,8 @@ class Function(Edge):
             target: The ID of the target node, or zero if none.
         """
         assert isinstance(attrs, dict)
-        assert not attrs or \
-            set(attrs) == {"_type"} and isinstance(attrs["_type"], str)
+        if not self.are_attrs_valid(attrs):
+            raise ValueError
         assert source == 0 or Relation.is_valid_id(source)
         assert target == 0 or Node.is_valid_id(target)
         super().__init__(id, attrs, source, target)
@@ -342,8 +351,8 @@ class Function(Edge):
             The self and the updated pattern.
         """
         assert isinstance(attrs, dict)
-        assert not attrs or \
-            set(attrs) == {"_type"} and isinstance(attrs["_type"], str)
+        if not self.are_attrs_valid(attrs):
+            raise ValueError
         return super().with_updated_attrs(attrs)
 
 
