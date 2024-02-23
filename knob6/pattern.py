@@ -440,7 +440,7 @@ class Graph:
                 element_reprs[id] = (f"f{len(function_ids)}",)
 
         # A dictionary of IDs of relations and lists of tuples of their
-        # mark characters, function names, and corresponding actor node IDs.
+        # mark characters, function types, and corresponding actor node IDs.
         relation_functions = {id: [] for id in relation_ids}
 
         # Collect both complete and incomplete functions (edges)
@@ -464,7 +464,8 @@ class Graph:
                         "->" +
                         element_reprs.get(element.target, ("", ))[0] +
                         "]"
-                    ) if element.source or element.target else "",
+                        if element.source or element.target else ""
+                    ),
                 )
 
         # Generate entity and relation bodies
