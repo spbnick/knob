@@ -1,5 +1,5 @@
 """
-KNOB - The (directed) graph
+KNOB - The directed graph (pattern)
 """
 
 from typing import cast, Final, Generator, Dict, Set, Union, Optional

@@ -1,5 +1,5 @@
 """
-KNOB - Knowledge graph patterns
+KNOB - The knowledge graph pattern
 """
 
 from typing import Optional, Tuple, Self

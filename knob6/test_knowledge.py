@@ -1,6 +1,6 @@
-"""Knob6 pattern tests."""
+"""Knob6 knowledge graph pattern tests."""
 import pytest
-from knob6.pattern import \
+from knob6.knowledge import \
     EntityGraph as E, RelationGraph as R, FunctionGraph as F
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
