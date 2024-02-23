@@ -1,6 +1,7 @@
 """Knob6 pattern tests."""
 import pytest
-from knob6.pattern import EntityGraph as E, RelationGraph as R
+from knob6.pattern import \
+    EntityGraph as E, RelationGraph as R, FunctionGraph as F
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
@@ -32,86 +33,148 @@ def r2():
     return R()
 
 
-def test_element(e1, r1):
+@pytest.fixture
+def f1():
+    """The first function graph pattern"""
+    return F()
+
+
+@pytest.fixture
+def f2():
+    """The second function graph pattern"""
+    return F()
+
+
+# NO, pylint: disable=too-many-arguments
+def test_element(e1, e2, r1, r2, f1, f2):
     assert repr(e1) == "e1 < e1 > e1"
+    assert repr(e1 | e2) == "e1 < e1, e2 > e2"
     assert repr(r1) == "r1 < r1 > r1"
+    assert repr(r1 | r2) == "r1 < r1, r2 > r2"
+    assert repr(f1) == "f1 < f1 > f1"
+    assert repr(f1 | f2) == "f1 < f1, f2 > f2"
 
 
-def test_element_mark(e1, r1):
+def test_element_mark(e1, r1, f1):
     assert repr(+e1) == "e1 < +e1 > e1"
     assert repr(-e1) == "e1 < e1 > e1"
 
     assert repr(+r1) == "r1 < +r1 > r1"
     assert repr(-r1) == "r1 < r1 > r1"
 
+    assert repr(+f1) == "f1 < +f1 > f1"
+    assert repr(-f1) == "f1 < f1 > f1"
 
-def test_element_update(e1, r1):
+
+def test_element_update(e1, r1, f1):
     assert repr(e1(x=1)) == "e1 < e1(x=1) > e1"
     assert repr(e1(**{'foo bar': 'baz'})) == "e1 < e1{'foo bar': 'baz'} > e1"
 
     assert repr(r1(x=1)) == "r1 < r1(x=1) > r1"
     assert repr(r1(**{'foo bar': 'baz'})) == "r1 < r1{'foo bar': 'baz'} > r1"
 
+    with pytest.raises(ValueError):
+        f1(x=1)
+    with pytest.raises(ValueError):
+        f1(x="func")
+    with pytest.raises(ValueError):
+        f1(_type=1)
+    assert repr(f1(_type="func")) == "f1 < f1.func > f1"
 
-def test_element_update_mark(e1, r1):
+
+def test_element_update_mark(e1, r1, f1):
     assert repr(+e1(x=1)) == "e1 < +e1(x=1) > e1"
     assert repr(-e1(x=1)) == "e1 < e1(x=1) > e1"
 
     assert repr(+r1(x=1)) == "r1 < +r1(x=1) > r1"
     assert repr(-r1(x=1)) == "r1 < r1(x=1) > r1"
 
+    assert repr(+f1(_type="func")) == "f1 < +f1.func > f1"
+    assert repr(-f1(_type="func")) == "f1 < f1.func > f1"
 
-def test_element_getattr(e1, r1):
+
+def test_element_getattr(e1, r1, f1):
     assert repr(e1.state) == "e1 < e1.state > e1"
     assert repr(e1.state.idle) == "e1 < e1.state.idle > e1"
     assert repr(r1.state) == "r1 < r1.state > r1"
     with pytest.raises(NotImplementedError):
-        repr(r1.state.idle)
+        r1.state.idle
+    assert repr(f1.state) == "f1 < f1.state > f1"
+    with pytest.raises(NotImplementedError):
+        f1.state.idle
 
 
-def test_element_getitem(e1, r1):
+def test_element_getitem(e1, r1, f1):
     assert repr(e1['foo bar']) == "e1 < e1['foo bar'] > e1"
     assert repr(r1['foo bar']) == "r1 < r1['foo bar'] > r1"
+    assert repr(f1['foo bar']) == "f1 < f1['foo bar'] > f1"
 
 
-def test_element_getattr_mark(e1, r1):
+def test_element_getattr_mark(e1, r1, f1):
     assert repr(+e1.state) == "e1 < +e1.state > e1"
     assert repr(-e1.state) == "e1 < e1.state > e1"
     assert repr(+r1.state) == "r1 < +r1.state > r1"
     assert repr(-r1.state) == "r1 < r1.state > r1"
+    assert repr(+f1.state) == "f1 < +f1.state > f1"
+    assert repr(-f1.state) == "f1 < f1.state > f1"
 
 
-def test_element_getitem_mark(e1, r1):
+def test_element_getitem_mark(e1, r1, f1):
     assert repr(+e1['foo bar']) == "e1 < +e1['foo bar'] > e1"
     assert repr(-e1['foo bar']) == "e1 < e1['foo bar'] > e1"
     assert repr(+r1['foo bar']) == "r1 < +r1['foo bar'] > r1"
     assert repr(-r1['foo bar']) == "r1 < r1['foo bar'] > r1"
+    assert repr(+f1['foo bar']) == "f1 < +f1['foo bar'] > f1"
+    assert repr(-f1['foo bar']) == "f1 < f1['foo bar'] > f1"
 
 
-def test_element_func_name_cast(e1, r1):
+def test_func_fill(e1, r1, f1):
+    assert repr(e1 - f1.func) == "e1 < e1, f1.func[->e1] > f1"
     assert repr(e1 - 'func') == "e1 < e1, f1.func[->e1] > f1"
     assert repr('func' - e1) == "f1 < e1, f1.func[->e1] > e1"
+    assert repr(f1.func - e1) == "f1 < e1, f1.func[->e1] > e1"
+    assert repr(r1 - f1.func) == "r1 < r1, f1.func[->r1] > f1"
     assert repr(r1 - 'func') == "r1 < r1, f1.func[->r1] > f1"
     assert repr('func' - r1) == "f1 < r1, f1.func[->r1] > r1"
+    assert repr(f1.func - r1) == "f1 < r1, f1.func[->r1] > r1"
 
 
-def test_element_func_name_open(e1, r1):
+def test_func_assign(e1, r1, f1):
+    with pytest.raises(ValueError):
+        _ = e1 * f1
+    with pytest.raises(ValueError):
+        _ = e1 * f1.func
     with pytest.raises(ValueError):
         _ = e1 * 'func'
     with pytest.raises(ValueError):
+        _ = f1 * e1
+    with pytest.raises(ValueError):
+        _ = f1.func * e1
+    with pytest.raises(ValueError):
         _ = 'func' * e1
+    assert repr(r1 * f1) == "r1 < r1, f1[r1->] > f1"
+    assert repr(r1 * f1.func) == "r1 < r1, f1.func[r1->] > f1"
     assert repr(r1 * 'func') == "r1 < r1, f1.func[r1->] > f1"
+    assert repr(f1 * r1) == "f1 < r1, f1[r1->] > r1"
+    assert repr(f1.func * r1) == "f1 < r1, f1.func[r1->] > r1"
     assert repr('func' * r1) == "f1 < r1, f1.func[r1->] > r1"
 
 
-def test_element_opening_cast(e1, r1):
+def test_func_assign_and_fill(e1, r1, f1):
+    assert repr(e1 - f1 * r1) == "e1 < e1, r1, f1[r1->e1] > r1"
+    assert repr(r1 * f1 - e1) == "r1 < e1, r1, f1[r1->e1] > e1"
+
+
+def test_func_complete(e1, r1, f1):
+    assert repr(e1 - f1.func * r1) == "e1 < e1, r1:(func=e1) > r1"
     assert repr(e1 - 'func' * r1) == "e1 < e1, r1:(func=e1) > r1"
     assert repr(e1 - 'ro le' * r1) == "e1 < e1, r1:{'ro le': e1} > r1"
+    assert repr(r1 * f1.func - e1) == "r1 < e1, r1:(func=e1) > e1"
     assert repr(r1 * 'func' - e1) == "r1 < e1, r1:(func=e1) > e1"
     assert repr(r1 * 'ro le' - e1) == "r1 < e1, r1:{'ro le': e1} > e1"
 
 
-def test_element_casting_open(e1, r1, r2):
+def test_assign_filled_func(e1, r1, r2):
     assert repr((e1 - 'func') * r1) == "e1 < e1, r1:(func=e1) > r1"
     assert repr(r1 * ('func' - e1)) == "r1 < e1, r1:(func=e1) > e1"
 
@@ -136,17 +199,17 @@ def test_element_casting_open(e1, r1, r2):
         "r1 < r1.x(a=1):(func=r2), r2.y(b=2) > r2"
 
 
-def test_double_cast(e1):
+def test_double_fill(e1):
     with pytest.raises(ValueError):
         e1 - 'func' - e1
 
 
-def test_double_open(r1):
+def test_double_assign(r1):
     with pytest.raises(ValueError):
         r1 * 'func' * r1
 
 
-def test_element_edge_element(e1, e2, r1):
+def test_entity_shift_entity(e1, e2, r1):
     assert repr(e1 >> e2) == "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
     assert repr(e1 - 'source' * r1 * 'target' - e2) == \
         "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
@@ -155,14 +218,14 @@ def test_element_edge_element(e1, e2, r1):
         "e1 < e1, e2, r1:(source=e2, target=e1) > e2"
 
 
-def test_element_edge_func(e1, r1):
+def test_entity_shift_relation(e1, r1):
     assert repr(e1 >> r1) == "e1 < e1, r1:(source=e1) > r1"
     assert repr(e1 << r1) == "e1 < e1, r1:(target=e1) > r1"
     assert repr(r1 >> e1) == "r1 < e1, r1:(target=e1) > e1"
     assert repr(r1 << e1) == "r1 < e1, r1:(source=e1) > e1"
 
 
-def test_element_edge_func_edge_element(e1, r1, e2):
+def test_entity_shift_relation_shift_entity(e1, r1, e2):
     assert repr(e1 >> (r1 >> e2)) == \
         "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
     assert repr((e1 >> r1) >> e2) == \
@@ -171,6 +234,15 @@ def test_element_edge_func_edge_element(e1, r1, e2):
         "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
     assert repr(e1 << r1 << e2) == \
         "e1 < e1, e2, r1:(source=e2, target=e1) > e2"
+
+
+def test_relation_shift_relation(r1, r2):
+    assert repr(r1 >> r2) == "r1 < r1, r2:(source=r1, target=r3), r3 > r3"
+    assert repr(r1 << r2) == "r1 < r1, r2:(source=r3, target=r1), r3 > r3"
+
+
+def test_mark_func(r1, f1, e1):
+    assert repr(r1 * +f1.func - e1) == "r1 < e1, r1:(+func=e1) > e1"
 
 
 def test_refs():
@@ -191,7 +263,7 @@ def test_refs():
     x = None
 
     assert repr(+(x := E().x) >> x) == \
-        'e1 < e1.x, r1:(source=e1, target=e1) > e1'
+        'e1 < +e1.x, r1:(source=e1, target=e1) > e1'
     x = None
 
     assert repr((x := E().x >> E().y) >> x) == (
