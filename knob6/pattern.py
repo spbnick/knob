@@ -24,6 +24,12 @@ class Element:
         """Check if an ID is valid for instances of this class"""
         return id > 0
 
+    @classmethod
+    def are_attrs_valid(cls, attrs: dict[str, AttrTypes]):
+        """Check if attributes dictionary is valid for an element"""
+        assert isinstance(attrs, dict)
+        return True
+
     def __init__(self, id: int, attrs: dict[str, AttrTypes]):
         """
         Initialize the element pattern.
@@ -51,6 +57,9 @@ class Element:
                     break
             else:
                 raise NotImplementedError("Implicit attributes exhausted")
+
+        if not self.are_attrs_valid(attrs):
+            raise ValueError
 
         self.attrs = attrs
 
@@ -317,8 +326,6 @@ class Function(Edge):
             target: The ID of the target node, or zero if none.
         """
         assert isinstance(attrs, dict)
-        if not self.are_attrs_valid(attrs):
-            raise ValueError
         assert source == 0 or Relation.is_valid_id(source)
         assert target == 0 or Node.is_valid_id(target)
         super().__init__(id, attrs, source, target)
@@ -337,23 +344,6 @@ class Function(Edge):
             (Node.ref_repr(self.target) if self.target else "") +
             "]"
         )
-
-    def with_updated_attrs(self, attrs: dict[str, AttrTypes]) -> \
-            Tuple[Self, Self]:
-        """
-        Duplicate the pattern with updated attributes.
-
-        Args:
-            attrs:  The attribute dictionary to update with.
-                    Can only be empty or contain the "_type" string attribute.
-
-        Returns:
-            The self and the updated pattern.
-        """
-        assert isinstance(attrs, dict)
-        if not self.are_attrs_valid(attrs):
-            raise ValueError
-        return super().with_updated_attrs(attrs)
 
 
 # Element pattern types operated by the graph pattern
