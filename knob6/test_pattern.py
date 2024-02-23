@@ -10,25 +10,25 @@ from knob6.pattern import EntityGraph as E, RelationGraph as R
 
 @pytest.fixture
 def e1():
-    """The first graph's entity atom operand"""
+    """The first entity graph pattern"""
     return E()
 
 
 @pytest.fixture
 def e2():
-    """The second graph's entity atom operand"""
+    """The second entity graph pattern"""
     return E()
 
 
 @pytest.fixture
 def r1():
-    """The first graph's relation atom operand"""
+    """The first relation graph pattern"""
     return R()
 
 
 @pytest.fixture
 def r2():
-    """The second graph's relation atom operand"""
+    """The second relation graph pattern"""
     return R()
 
 
