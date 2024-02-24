@@ -178,15 +178,20 @@ class Graph:
     def __repr__(self):
         # A map of nodes and their representations
         nodes = {
-            node: (f"n{i + 1}", node.attrs_repr())
+            node: (
+                ("", "+")[node in self.marked],
+                f"n{i + 1}",
+                node.attrs_repr()
+            )
             for i, node in enumerate(sorted(self.nodes, key=lambda n: n.id))
         }
         # A map of edges and their representations
         edges = {
             edge: (
+                ("", "+")[edge in self.marked],
                 f"e{i + 1}"
-                f"[{nodes[edge.source][0]}->{nodes[edge.target][0]}]"
-                f"{edge.attrs_repr()}",
+                f"[{nodes[edge.source][1]}->{nodes[edge.target][1]}]"
+                f"{edge.attrs_repr()}"
             )
             for i, edge in enumerate(sorted(self.edges, key=lambda e: e.id))
         }
