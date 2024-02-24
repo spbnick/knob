@@ -159,6 +159,8 @@ class Graph:
                         "elements" (possibly via edges) or "nodes".
             marked:     A set of elements considered "marked", or None for
                         empty set. Must be a subset of graph elements.
+                        Nodes referenced by edges in this set are *not*
+                        considered marked as well.
         """
         self.nodes: Set[Node] = set()
         self.edges: Set[Edge] = set()
@@ -228,6 +230,8 @@ class Graph:
                         "elements" (possibly via edges) or "nodes".
             marked:     A set of elements to "mark", or None for empty set.
                         Must be a subset of existing and added graph elements.
+                        Nodes referenced by edges in this set are *not*
+                        considered marked as well.
 
         Returns:
             The modified graph (self).
@@ -283,6 +287,8 @@ class Graph:
                         Must contain all edges incident to nodes in "nodes".
             marked:     A set of elements to "unmark", or None for empty set.
                         Must be a subset of existing elements.
+                        Nodes referenced by edges in this set are *not*
+                        considered marked as well.
 
         Returns:
             The modified graph (self).
