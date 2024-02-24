@@ -356,7 +356,7 @@ class Graph:
 
     def __init__(self,
                  elements: dict[int, GraphElements],
-                 marks: dict[int, bool],
+                 marked: dict[int, bool],
                  left: int, right: int):
         """
         Initialize the graph pattern.
@@ -365,7 +365,7 @@ class Graph:
             elements:   A dictionary of element IDs and corresponding element
                         (entity/relation/function) patterns. The pattern IDs
                         must match corresponding dictionary keys.
-            marks:      A dictionary of elements and their marked status:
+            marked:     A dictionary of elements and their marked status:
                         either False, or True. Elements without their ID in
                         this dictionary are considered unmarked when the
                         pattern is applied, and unset, when the pattern is
@@ -389,9 +389,9 @@ class Graph:
             id == e.id
             for id, e in elements.items()
         )
-        assert isinstance(marks, dict)
-        assert set(marks) <= set(elements)
-        assert all(isinstance(m, bool) for m in marks.values())
+        assert isinstance(marked, dict)
+        assert set(marked) <= set(elements)
+        assert all(isinstance(m, bool) for m in marked.values())
         assert all(
             (not e.source or e.source in elements) and
             (not e.target or e.target in elements)
@@ -399,7 +399,7 @@ class Graph:
         ), "A function references an unknown node"
 
         self.elements = elements
-        self.marks = marks
+        self.marked = marked
         self.left = left
         self.right = right
 
@@ -446,7 +446,7 @@ class Graph:
             if element.source and element.target and \
                "_type" in element.attrs:
                 relation_functions[element.source].append((
-                    ("", "+")[self.marks.get(id, False)],
+                    ("", "+")[self.marked.get(id, False)],
                     element.attrs["_type"],
                     element.target
                 ))
@@ -484,7 +484,7 @@ class Graph:
 
         # Put everything together
         return f"{element_reprs[self.left][0]} < " + ", ".join(
-            ("", "+")[self.marks.get(id, False)] + "".join(element_reprs[id])
+            ("", "+")[self.marked.get(id, False)] + "".join(element_reprs[id])
             for id in (entity_ids + relation_ids + function_ids)
         ) + f" > {element_reprs[self.right][0]}"
 
@@ -498,7 +498,7 @@ class Graph:
             f"New element has different ID ({new.id} != {old.id})"
         elements = self.elements.copy()
         elements[new.id] = new
-        gp = Graph(elements, self.marks, self.left, self.right)
+        gp = Graph(elements, self.marked, self.left, self.right)
         # print(f"{self} . with_replaced_atom({old}, {new}) -> {gp}")
         return gp
 
@@ -509,16 +509,17 @@ class Graph:
         elements = self.elements.copy()
         for id, element in other.elements.items():
             elements[id] = elements.get(id, element) | element
-        marks = dict(
+        marked = dict(
             filter(
                 lambda id_mark: id_mark[1] is not None,
                 map(
-                    lambda id: (id, other.marks.get(id, self.marks.get(id))),
-                    set(self.marks) | set(other.marks)
+                    lambda id:
+                        (id, other.marked.get(id, self.marked.get(id))),
+                    set(self.marked) | set(other.marked)
                 )
             )
         )
-        return Graph(elements, marks, self.left, other.right)
+        return Graph(elements, marked, self.left, other.right)
 
     def __pos__(self):
         """Mark all elements in the graph pattern"""
