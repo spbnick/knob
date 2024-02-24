@@ -220,6 +220,7 @@ class Graph:
             return NotImplemented
         self.nodes |= other.nodes
         self.edges |= other.edges
+        self.marked |= other.marked
         return self
 
     def add(self, *elements: Elements,
