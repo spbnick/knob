@@ -157,10 +157,28 @@ class Graph:
         self.marked: set[Elements] = set()
         self.add(elements=elements, marked=marked)
 
+    @classmethod
+    def coerce(cls, other):
+        """
+        Try coercing a value to an instance of this class, using the
+        to_dg() method, if present.
+
+        Args:
+            other: The value to coerce.
+
+        Returns:
+            The potentially coerced value.
+        """
+        if callable(getattr(other, "to_dg", None)):
+            other = other.to_dg()
+            assert isinstance(other, Graph)
+        return other
+
     def __hash__(self):
         return hash((frozenset(self.elements), frozenset(self.marked)))
 
     def __eq__(self, other):
+        other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
         return self.elements == other.elements and self.marked == other.marked
@@ -221,12 +239,14 @@ class Graph:
         return Graph(elements=self.elements, marked=self.marked)
 
     def __or__(self, other):
+        other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
         return Graph(elements=self.elements | other.elements,
                      marked=self.marked | other.marked)
 
     def __ior__(self, other):
+        other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
         self.elements |= other.elements
