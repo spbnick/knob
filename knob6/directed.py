@@ -142,7 +142,8 @@ class Graph:
 
     def __init__(self, *elements: Elements,
                  nodes: Optional[Set[Node]] = None,
-                 edges: Optional[Set[Edge]] = None):
+                 edges: Optional[Set[Edge]] = None,
+                 marked: Optional[Set[Elements]] = None):
         """
         Initialize a graph.
 
@@ -156,10 +157,13 @@ class Graph:
                         or None for empty set.
                         Nodes referenced by these edges must exist in either
                         "elements" (possibly via edges) or "nodes".
+            marked:     A set of elements considered "marked", or None for
+                        empty set. Must be a subset of graph elements.
         """
         self.nodes: Set[Node] = set()
         self.edges: Set[Edge] = set()
-        self.add(*elements, nodes=nodes, edges=edges)
+        self.marked: Set[Elements] = set()
+        self.add(*elements, nodes=nodes, edges=edges, marked=marked)
 
     def __hash__(self):
         return hash((frozenset(self.nodes), frozenset(self.edges)))
@@ -189,13 +193,14 @@ class Graph:
         ) + "}"
 
     def __copy__(self):
-        return Graph(nodes=self.nodes, edges=self.edges)
+        return Graph(nodes=self.nodes, edges=self.edges, marked=self.marked)
 
     def __or__(self, other):
         if not isinstance(other, Graph):
             return NotImplemented
         return Graph(nodes=self.nodes | other.nodes,
-                     edges=self.edges | other.edges)
+                     edges=self.edges | other.edges,
+                     marked=self.marked | other.marked)
 
     def __ior__(self, other):
         if not isinstance(other, Graph):
@@ -206,7 +211,8 @@ class Graph:
 
     def add(self, *elements: Elements,
             nodes: Optional[Set[Node]] = None,
-            edges: Optional[Set[Edge]] = None):
+            edges: Optional[Set[Edge]] = None,
+            marked: Optional[Set[Elements]] = None):
         """
         Add elements to the graph.
 
@@ -220,6 +226,8 @@ class Graph:
                         or None for empty set.
                         Nodes referenced by these edges must exist in either
                         "elements" (possibly via edges) or "nodes".
+            marked:     A set of elements to "mark", or None for empty set.
+                        Must be a subset of existing and added graph elements.
 
         Returns:
             The modified graph (self).
@@ -232,6 +240,8 @@ class Graph:
         assert edges is None or isinstance(edges, set) and all(
             isinstance(edge, Edge) for edge in edges
         )
+        assert marked is None or isinstance(marked, set)
+
         for element in elements:
             if isinstance(element, Node):
                 self.nodes.add(element)
@@ -248,11 +258,17 @@ class Graph:
                 for edge in edges
             ), f"Edges {edges} reference nodes not in {nodes}"
             self.edges |= edges
+
+        if marked:
+            assert marked <= self.nodes | self.edges
+            self.marked |= marked
+
         return self
 
     def remove(self, *elements: Elements,
                nodes: Optional[Set[Node]] = None,
-               edges: Optional[Set[Edge]] = None):
+               edges: Optional[Set[Edge]] = None,
+               marked: Optional[Set[Elements]] = None):
         """
         Remove elements from the graph.
 
@@ -265,6 +281,8 @@ class Graph:
                         either "elements" or "edges".
             edges:      A set of edges to remove, or None for empty set.
                         Must contain all edges incident to nodes in "nodes".
+            marked:     A set of elements to "unmark", or None for empty set.
+                        Must be a subset of existing elements.
 
         Returns:
             The modified graph (self).
@@ -277,6 +295,12 @@ class Graph:
         assert edges is None or isinstance(edges, set) and all(
             isinstance(edge, Edge) for edge in edges
         )
+        assert marked is None or \
+            isinstance(marked, set) and marked <= self.nodes | self.edges
+
+        if marked:
+            self.marked -= marked
+
         if nodes is None:
             nodes = set()
         if edges is None:
@@ -287,9 +311,12 @@ class Graph:
                 nodes.add(element)
             elif isinstance(element, Edge):
                 edges.add(element)
+
         assert all(self.get_incident_edges(node) <= edges for node in nodes)
         self.nodes -= nodes
         self.edges -= edges
+        self.marked -= nodes | edges
+
         return self
 
     def graphviz(self) -> str:
@@ -329,7 +356,7 @@ class Graph:
         def format_label(element: Node | Edge):
             """Format a label for a graphviz element"""
             return "\\n".join(
-                [elements[element]] +
+                [("", "+")[element in self.marked] + elements[element]] +
                 [f"{quote(n)}={quote(trim(v))}"
                  for n, v in element.attrs.items()]
             )
@@ -566,50 +593,44 @@ class Graph:
         """
         return bool(next(self.detailed_match(other), False))
 
-    def graft(self, other: "Graph", *elements: Elements):
+    def graft(self, other: "Graph"):
         """
-        Graft another graph onto this one, adding specified elements from the
+        Graft another graph onto this one, adding marked elements from the
         other graph, connecting the nodes matching the rest.
 
         Args:
             other:      The graph to graft onto this one.
-                        The elements of this graph, which are not in
-                        "elements" will be matched against this graph to find
-                        the nodes where the added elements should be
-                        connected.
-            elements:   The elements of the drafted graph, which should be
-                        added to this one. All elements must be from the
-                        "other" graph.
+                        The "unmarked" elements of this graph will be matched
+                        against this graph to find the nodes where the added
+                        "marked" elements will be connected.
 
         Returns:
             A new graph with the elements grafted onto it,
             or None if there were no matches.
         """
-        element_set = set(elements)
-        nodes = other.nodes & element_set
-        edges = other.edges & element_set
-        assert element_set == nodes | edges
+        marked_nodes = {e for e in other.marked if isinstance(e, Node)}
+        marked_edges = {e for e in other.marked if isinstance(e, Edge)}
 
         edges_internal = {
-            edge for edge in edges
-            if {edge.source, edge.target} <= nodes
+            edge for edge in marked_edges
+            if {edge.source, edge.target} <= marked_nodes
         }
-        edges_external = edges - edges_internal
+        edges_external = marked_edges - edges_internal
 
         edges_to_add = None
         for matches in Graph(
-            nodes=other.nodes - nodes,
-            edges=other.edges - edges
+            nodes=other.nodes - marked_nodes,
+            edges=other.edges - marked_edges
         ).detailed_match(self):
             if edges_to_add is None:
                 edges_to_add = edges_internal
             edges_to_add |= {
                 Edge(
                     source=edge.source
-                    if edge.source in nodes
+                    if edge.source in marked_nodes
                     else cast(Node, matches[edge.source]),
                     target=edge.target
-                    if edge.target in nodes
+                    if edge.target in marked_nodes
                     else cast(Node, matches[edge.target]),
                     **edge.attrs
                 )
@@ -617,9 +638,9 @@ class Graph:
             }
 
         return None if edges_to_add is None \
-            else copy(self).add(nodes=nodes, edges=edges_to_add)
+            else copy(self).add(nodes=marked_nodes, edges=edges_to_add)
 
-    def prune(self, other: "Graph", *elements: Elements):
+    def prune(self, other: "Graph"):
         """
         Prune another graph from this one by matching, and removing the
         elements matching the specified ones.
@@ -627,23 +648,17 @@ class Graph:
         Args:
             other:      The graph to prune from this one.
                         It will be matched against this graph, and then
-                        elements matching the ones in "elements" will be
-                        removed.
-            elements:   The elements of the "other" graph, which should match
-                        the elements to be removed from this one. All elements
-                        must be from the "other" graph.
+                        elements matching "marked" ones will be removed.
 
         Returns:
             A new graph with the elements pruned from it,
             or None if there were no matches.
         """
-        element_set = set(elements)
-        assert element_set <= (other.nodes | other.edges)
         pruned = None
         for matches in other.detailed_match(self):
             if pruned is None:
                 pruned = copy(self)
             pruned.remove(*(
-                matches[element] for element in element_set
+                matches[element] for element in other.marked
             ))
         return pruned

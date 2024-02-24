@@ -1,7 +1,6 @@
 """Knob6 directed graph tests."""
 import itertools
 from copy import copy
-import pytest
 from knob6.directed import Node as N, Edge as E, Graph as G
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
@@ -201,35 +200,29 @@ def test_graft_empty_pattern():
     assert g.graft(G()) == g
 
 
-def test_graft_unknown_elements():
-    e = E(N(x=1), N(x=2))
-    with pytest.raises(AssertionError):
-        G().graft(G(), e)
-
-
 def test_graft_mismatch():
     e = E(N(x=1), N(x=2))
-    assert G().graft(G(e), e) is None
+    assert G().graft(G(e, marked={e})) is None
 
 
 def test_graft_node_to_null():
     n = N()
-    assert G().graft(G(n), n) == G(n)
+    assert G().graft(G(n, marked={n})) == G(n)
 
 
 def test_graft_node_to_non_null():
     n1 = N()
     n2 = N()
-    assert G(n1).graft(G(n2), n2) == G(n1, n2)
+    assert G(n1).graft(G(n2, marked={n2})) == G(n1, n2)
 
 
 def test_graft_edge_to_null():
     e = E(N(), N())
     assert G().graft(G(e)) is None
-    assert G().graft(G(e), e) is None
-    assert G().graft(G(e), e, e.source) is None
-    assert G().graft(G(e), e, e.target) is None
-    assert G().graft(G(e), e, e.source, e.target) == G(e)
+    assert G().graft(G(e, marked={e})) is None
+    assert G().graft(G(e, marked={e, e.source})) is None
+    assert G().graft(G(e, marked={e, e.target})) is None
+    assert G().graft(G(e, marked={e, e.source, e.target})) == G(e)
 
 
 def test_graft_edge_to_non_null():
@@ -240,16 +233,22 @@ def test_graft_edge_to_non_null():
     e13 = E(n1, n3)
     e23 = E(n2, n3)
     assert G(n1, n2).graft(G(e12)) is None
-    assert G(n1, n2).graft(G(e12), e12).matches(G(e12))
-    assert G(n1, n2).graft(G(e13), e13) is None
-    assert G(n1, n2).graft(G(e13), e13, n3).matches(G(e13, n2))
-    assert G(n1).graft(G(e12, e13, e23), e12, e13, e23, n2, n3).matches(
+    assert G(n1, n2).graft(G(e12, marked={e12})).matches(G(e12))
+    assert G(n1, n2).graft(G(e13, marked={e13})) is None
+    assert G(n1, n2).graft(G(e13, marked={e13, n3})).matches(G(e13, n2))
+    assert G(n1).graft(
+        G(e12, e13, e23, marked={e12, e13, e23, n2, n3})
+    ).matches(
         G(e12, e13, e23)
     )
-    assert G(n1, n2).graft(G(e12, e13, e23), e12, e13, e23, n3).matches(
+    assert G(n1, n2).graft(
+        G(e12, e13, e23, marked={e12, e13, e23, n3})
+    ).matches(
         G(e12, e13, e23)
     )
-    assert G(n1, n2, n3).graft(G(e12, e13, e23), e12, e13, e23).matches(
+    assert G(n1, n2, n3).graft(
+        G(e12, e13, e23, marked={e12, e13, e23})
+    ).matches(
         G(e12, e13, e23)
     )
 
@@ -280,8 +279,8 @@ def test_graft_topographic():
         E(n[0][1], n[1][1]),
         E(n[0][2], n[1][2]),
     }
-    gp = copy(g).add(edges=new_edges)
-    assert gp.matches(g.graft(gp, *new_edges))
+    gp = copy(g).add(edges=new_edges, marked=new_edges)
+    assert gp.matches(g.graft(gp))
 
 
 def disabled_test_graft_connect_two_subgraphs():
@@ -392,12 +391,6 @@ def test_prune_empty_pattern():
     assert g.prune(G()) == g
 
 
-def test_prune_unknown_elements():
-    e = E(N(x=1), N(x=2))
-    with pytest.raises(AssertionError):
-        G().graft(G(), e)
-
-
 def test_prune_mismatch():
     e = E(N(x=1), N(x=2))
-    assert G().prune(G(e), e) is None
+    assert G().prune(G(e, marked={e})) is None
