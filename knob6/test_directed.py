@@ -1,11 +1,32 @@
 """Knob6 directed graph tests."""
 import itertools
+import functools
 from copy import copy
-from knob6.directed import Node as N, Edge as E, Graph as G
+from typing import Optional
+from knob6.directed import Node as N, Edge as E, Graph, Elements
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
 # We need them, pylint: disable=fixme
+
+
+class G(Graph):
+    """A directed graph allowing indirect element specification"""
+    def __init__(self, *elements: Elements,
+                 marked: Optional[set[Elements]] = None):
+        empty_elements: set[Elements] = set()
+        super().__init__(
+            elements=functools.reduce(
+                lambda a, b: a | b,
+                (
+                    {e} if isinstance(e, N)
+                    else {e, e.source, e.target}  # type: ignore
+                    for e in elements
+                ),
+                empty_elements
+            ),
+            marked=marked
+        )
 
 
 def test_match_empty_both():
@@ -279,7 +300,7 @@ def test_graft_topographic():
         E(n[0][1], n[1][1]),
         E(n[0][2], n[1][2]),
     }
-    gp = copy(g).add(edges=new_edges, marked=new_edges)
+    gp = copy(g).add(new_edges, new_edges)
     assert gp.matches(g.graft(gp))
 
 

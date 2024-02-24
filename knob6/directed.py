@@ -2,7 +2,7 @@
 KNOB - The directed graph (pattern)
 """
 
-from typing import cast, Final, Generator, Dict, Set, Optional
+from typing import cast, Final, Generator, Dict, Optional, Self
 from copy import copy
 import graphviz  # type: ignore
 from knob6.misc import AttrTypes, attrs_repr
@@ -140,201 +140,165 @@ Elements = Node | Edge
 class Graph:
     """A directed graph"""
 
-    def __init__(self, *elements: Elements,
-                 nodes: Optional[Set[Node]] = None,
-                 edges: Optional[Set[Edge]] = None,
-                 marked: Optional[Set[Elements]] = None):
+    def __init__(self,
+                 elements: Optional[set[Elements]] = None,
+                 marked: Optional[set[Elements]] = None):
         """
         Initialize a graph.
 
         Args:
-            elements:   A tuple of graph elements (nodes or edges).
-                        Nodes referenced by edges in this tuple are also added
-                        to the graph.
-            nodes:      A set of nodes to add to the elements,
-                        or None for empty set.
-            edges:      A set of edges to add to the elements,
-                        or None for empty set.
-                        Nodes referenced by these edges must exist in either
-                        "elements" (possibly via edges) or "nodes".
-            marked:     A set of elements considered "marked", or None for
+            elements:   The set of graph elements (nodes or edges), or None
+                        for empty set. Edges in this set can only reference
+                        nodes from the same set.
+            marked:     The set of elements considered "marked", or None for
                         empty set. Must be a subset of graph elements.
-                        Nodes referenced by edges in this set are *not*
-                        considered marked as well.
         """
-        self.nodes: Set[Node] = set()
-        self.edges: Set[Edge] = set()
-        self.marked: Set[Elements] = set()
-        self.add(*elements, nodes=nodes, edges=edges, marked=marked)
+        self.elements: set[Elements] = set()
+        self.marked: set[Elements] = set()
+        self.add(elements=elements, marked=marked)
 
     def __hash__(self):
-        return hash((frozenset(self.nodes),
-                     frozenset(self.edges),
-                     frozenset(self.marked)))
+        return hash((frozenset(self.elements), frozenset(self.marked)))
 
     def __eq__(self, other):
         if not isinstance(other, Graph):
             return NotImplemented
-        return (
-            self.nodes == other.nodes and
-            self.edges == other.edges and
-            self.marked == other.marked
-        )
+        return self.elements == other.elements and self.marked == other.marked
+
+    def get_nodes(self) -> set[Node]:
+        """Extract the set of nodes from the set of graph elements"""
+        return set(filter(
+            lambda e: isinstance(e, Node),  # type: ignore
+            self.elements
+        ))
+
+    def get_edges(self) -> set[Edge]:
+        """Extract the set of edges from the set of graph elements"""
+        return set(filter(
+            lambda e: isinstance(e, Edge),  # type: ignore
+            self.elements
+        ))
+
+    def get_marked_nodes(self) -> set[Node]:
+        """Extract the set of nodes from the set of marked graph elements"""
+        return set(filter(
+            lambda e: isinstance(e, Node),  # type: ignore
+            self.marked
+        ))
+
+    def get_marked_edges(self) -> set[Edge]:
+        """Extract the set of edges from the set of marked graph elements"""
+        return set(filter(
+            lambda e: isinstance(e, Edge),  # type: ignore
+            self.marked
+        ))
 
     def __repr__(self):
-        # A map of nodes and their representations
-        nodes = {
+        # Collect node element representations
+        elements = {
             node: (
                 ("", "+")[node in self.marked],
                 f"n{i + 1}",
                 node.attrs_repr()
             )
-            for i, node in enumerate(sorted(self.nodes, key=lambda n: n.id))
+            for i, node in
+            enumerate(sorted(self.get_nodes(), key=lambda n: n.id))
         }
-        # A map of edges and their representations
-        edges = {
+        # Add edge element representations
+        elements |= {
             edge: (
                 ("", "+")[edge in self.marked],
                 f"e{i + 1}"
-                f"[{nodes[edge.source][1]}->{nodes[edge.target][1]}]"
+                f"[{elements[edge.source][1]}->{elements[edge.target][1]}]"
                 f"{edge.attrs_repr()}"
             )
-            for i, edge in enumerate(sorted(self.edges, key=lambda e: e.id))
+            for i, edge in
+            enumerate(sorted(self.get_edges(), key=lambda n: n.id))
         }
-        return "{" + ", ".join(
-            map("".join, list(nodes.values()) + list(edges.values()))
-        ) + "}"
+        return "{" + ", ".join(map("".join, list(elements.values()))) + "}"
 
     def __copy__(self):
-        return Graph(nodes=self.nodes, edges=self.edges, marked=self.marked)
+        return Graph(elements=self.elements, marked=self.marked)
 
     def __or__(self, other):
         if not isinstance(other, Graph):
             return NotImplemented
-        return Graph(nodes=self.nodes | other.nodes,
-                     edges=self.edges | other.edges,
+        return Graph(elements=self.elements | other.elements,
                      marked=self.marked | other.marked)
 
     def __ior__(self, other):
         if not isinstance(other, Graph):
             return NotImplemented
-        self.nodes |= other.nodes
-        self.edges |= other.edges
+        self.elements |= other.elements
         self.marked |= other.marked
         return self
 
-    def add(self, *elements: Elements,
-            nodes: Optional[Set[Node]] = None,
-            edges: Optional[Set[Edge]] = None,
-            marked: Optional[Set[Elements]] = None):
+    def add(self,
+            elements: Optional[set[Elements]] = None,
+            marked: Optional[set[Elements]] = None) -> Self:
         """
         Add elements to the graph.
 
         Args:
-            elements:   A tuple of graph elements (nodes or edges).
-                        Nodes referenced by edges in this tuple are also added
-                        to the graph.
-            nodes:      A set of nodes to add to the elements,
-                        or None for empty set.
-            edges:      A set of edges to add to the elements,
-                        or None for empty set.
-                        Nodes referenced by these edges must exist in either
-                        "elements" (possibly via edges) or "nodes".
-            marked:     A set of elements to "mark", or None for empty set.
-                        Must be a subset of existing and added graph elements.
-                        Nodes referenced by edges in this set are *not*
-                        considered marked as well.
+            elements:   The set of graph elements (nodes or edges) to add, or
+                        None for empty set. Edges can only reference nodes
+                        from this or the existing set of elements.
+            marked:     The set of elements to consider "marked", or None for
+                        empty set. Must be a subset of existing and added
+                        elements.
 
         Returns:
             The modified graph (self).
         """
-        assert isinstance(elements, tuple)
-        assert all(isinstance(element, ELEMENTS) for element in elements)
-        assert nodes is None or isinstance(nodes, set) and all(
-            isinstance(node, Node) for node in nodes
-        )
-        assert edges is None or isinstance(edges, set) and all(
-            isinstance(edge, Edge) for edge in edges
-        )
-        assert marked is None or isinstance(marked, set)
-
-        for element in elements:
-            if isinstance(element, Node):
-                self.nodes.add(element)
-            elif isinstance(element, Edge):
-                self.edges.add(element)
-                self.nodes.add(element.source)
-                self.nodes.add(element.target)
-        if nodes:
-            self.nodes |= nodes
-        if edges:
-            assert all(
-                edge.source in self.nodes and
-                edge.target in self.nodes
-                for edge in edges
-            ), f"Edges {edges} reference nodes not in {nodes}"
-            self.edges |= edges
-
-        if marked:
-            assert marked <= self.nodes | self.edges
-            self.marked |= marked
-
+        if elements is None:
+            elements = set()
+        assert isinstance(elements, set)
+        assert all(isinstance(e, ELEMENTS) for e in elements)
+        new_elements = self.elements | elements
+        assert all(
+            not isinstance(e, Edge) or
+            e.source in new_elements and
+            e.target in new_elements
+            for e in elements
+        ), "Edges reference unknown nodes"
+        if marked is None:
+            marked = set()
+        assert isinstance(marked, set)
+        assert marked <= new_elements, "Unknown elements are being marked"
+        self.elements = new_elements
+        self.marked |= marked
         return self
 
-    def remove(self, *elements: Elements,
-               nodes: Optional[Set[Node]] = None,
-               edges: Optional[Set[Edge]] = None,
-               marked: Optional[Set[Elements]] = None):
+    def remove(self,
+               elements: Optional[set[Elements]] = None,
+               marked: Optional[set[Elements]] = None) -> Self:
         """
         Remove elements from the graph.
 
         Args:
-            elements:   A tuple of graph elements (nodes or edges).
-                        Any edges incident to the nodes in this tuple are
-                        also removed from the graph.
-            nodes:      A set of nodes to remove, or None for empty set.
-                        Any edges incident to these nodes must exist in
-                        either "elements" or "edges".
-            edges:      A set of edges to remove, or None for empty set.
-                        Must contain all edges incident to nodes in "nodes".
+            elements:   The set of graph elements (nodes or edges) to remove.
+                        Must contain all existing edges incident to any nodes
+                        in the set. Unknown elements are ignored.
             marked:     A set of elements to "unmark", or None for empty set.
-                        Must be a subset of existing elements.
-                        Nodes referenced by edges in this set are *not*
-                        considered marked as well.
+                        Unknown elements, or already unmarked elements are
+                        ignored.
 
         Returns:
             The modified graph (self).
         """
-        assert isinstance(elements, tuple)
-        assert all(isinstance(element, ELEMENTS) for element in elements)
-        assert nodes is None or isinstance(nodes, set) and all(
-            isinstance(node, Node) for node in nodes
-        )
-        assert edges is None or isinstance(edges, set) and all(
-            isinstance(edge, Edge) for edge in edges
-        )
-        assert marked is None or \
-            isinstance(marked, set) and marked <= self.nodes | self.edges
-
-        if marked:
-            self.marked -= marked
-
-        if nodes is None:
-            nodes = set()
-        if edges is None:
-            edges = set()
-        for element in set(elements):
-            if isinstance(element, Node):
-                edges |= self.get_incident_edges(element)
-                nodes.add(element)
-            elif isinstance(element, Edge):
-                edges.add(element)
-
-        assert all(self.get_incident_edges(node) <= edges for node in nodes)
-        self.nodes -= nodes
-        self.edges -= edges
-        self.marked -= nodes | edges
-
+        if elements is None:
+            elements = set()
+        assert isinstance(elements, set)
+        assert all(isinstance(e, ELEMENTS) for e in elements)
+        if marked is None:
+            marked = set()
+        assert isinstance(marked, set)
+        assert self.get_incident_edges(
+            {e for e in elements if isinstance(e, Node)}
+        ) <= elements, "Incident edges are not being removed"
+        self.marked -= marked
+        self.marked -= elements
+        self.elements -= elements
         return self
 
     def graphviz(self) -> str:
@@ -344,20 +308,16 @@ class Graph:
         Returns:
             The rendered Graphviz source code.
         """
-        # A map of nodes and their graphviz IDs
-        nodes = {
+        # Generate element graphviz IDs
+        element_ids = {
             node: str(i + 1)
-            for i, node in enumerate(sorted(self.nodes, key=lambda n: n.id))
-        }
-
-        # A map of edges and their graphviz IDs
-        edges = {
+            for i, node in
+            enumerate(sorted(self.get_nodes(), key=lambda n: n.id))
+        } | {
             edge: str(i + 1)
-            for i, edge in enumerate(sorted(self.edges, key=lambda n: n.id))
+            for i, edge in
+            enumerate(sorted(self.get_edges(), key=lambda n: n.id))
         }
-
-        # A map of elements and their graphviz IDs
-        elements = nodes | edges
 
         def trim(v: AttrTypes):
             """Trim a value to a certain maximum length, if necessary"""
@@ -371,33 +331,43 @@ class Graph:
                 else repr(v)
             )
 
-        def format_label(element: Node | Edge):
+        def format_label(element: Elements):
             """Format a label for a graphviz element"""
             return "\\n".join(
-                [("", "+")[element in self.marked] + elements[element]] +
+                [("", "+")[element in self.marked] + element_ids[element]] +
                 [f"{quote(n)}={quote(trim(v))}"
                  for n, v in element.attrs.items()]
             )
 
         graph = graphviz.Digraph(node_attr=dict(shape="box"))
-        for node, id in nodes.items():
-            graph.node(id, label=format_label(node))
-        for edge in self.edges:
-            graph.edge(nodes[edge.source], nodes[edge.target],
-                       label=format_label(edge))
+        for element, id in element_ids.items():
+            if isinstance(element, Node):
+                graph.node(id, label=format_label(element))
+            elif isinstance(element, Edge):
+                graph.edge(element_ids[element.source],
+                           element_ids[element.target],
+                           label=format_label(element))
         return graph.source
 
-    def get_incident_edges(self, node: Node) -> Set[Edge]:
+    def get_incident_edges(self, nodes: set[Node] | Node) -> set[Edge]:
         """
-        Get edges incident to a node (both incoming and outgoing).
+        Get edges incident to nodes in the specified set (both incoming and
+        outgoing).
 
         Args:
-            node:   The node to get the edges for.
+            nodes:  The set of nodes, or a single node to get the incident
+                    edges for.
 
         Returns:
-            A set containing edges incident to the node.
+            A set containing edges incident to the nodes.
         """
-        return set(filter(lambda e: node in (e.source, e.target), self.edges))
+        if isinstance(nodes, Node):
+            nodes = {nodes}
+        return set(filter(
+            lambda e: isinstance(e, Edge) and  # type: ignore
+            {e.source, e.target} & nodes,
+            self.elements
+        ))
 
     def detailed_match(self, other: "Graph") -> Generator[
         Dict[Elements, Elements], None, None
@@ -413,6 +383,11 @@ class Graph:
             and the matched element of the other graph, whenever this graph
             matches completely.
         """
+        self_nodes = self.get_nodes()
+        self_edges = self.get_edges()
+        other_nodes = other.get_nodes()
+        other_edges = other.get_edges()
+
         def match_components(
             matches: Dict[Elements, Elements],
             self_node: Node,
@@ -447,11 +422,11 @@ class Graph:
             assert isinstance(matches, dict)
             assert all(type(s) is type(o) and
                        isinstance(s, Element) and
-                       s in self.nodes and o in other.nodes or
-                       s in self.edges and o in other.edges
+                       s in self_nodes and o in other_nodes or
+                       s in self_edges and o in other_edges
                        for s, o in matches.items())
-            self_matches: Final[Set] = set(matches.keys())
-            other_matches: Final[Set] = set(matches.values())
+            self_matches: Final[set] = set(matches.keys())
+            other_matches: Final[set] = set(matches.values())
             assert all(
                 s.source in self_matches and s.target in self_matches
                 for s in self_matches if isinstance(s, Edge)
@@ -465,7 +440,8 @@ class Graph:
             # print_stack_indented(f"match_components"
             #                      f"{(matches, self_node, other_node)}")
 
-            rem_self_edges = self.get_incident_edges(self_node) - self_matches
+            rem_self_edges = \
+                self.get_incident_edges(self_node) - self_matches
 
             # If there are no edges left to match
             if not rem_self_edges:
@@ -473,8 +449,8 @@ class Graph:
                 yield matches
                 return
 
-            rem_other_edges = other.get_incident_edges(other_node) - \
-                other_matches
+            rem_other_edges = \
+                other.get_incident_edges(other_node) - other_matches
 
             # For every combination of self and other edges
             for self_edge in rem_self_edges:
@@ -539,11 +515,11 @@ class Graph:
             """
             assert isinstance(matches, dict)
             assert all(type(s) is type(o) and
-                       s in self.nodes and o in other.nodes or
-                       s in self.edges and o in other.edges
+                       s in self_nodes and o in other_nodes or
+                       s in self_edges and o in other_edges
                        for s, o in matches.items())
-            self_matches: Final[Set] = set(matches.keys())
-            other_matches: Final[Set] = set(matches.values())
+            self_matches: Final[set] = set(matches.keys())
+            other_matches: Final[set] = set(matches.values())
             assert all(
                 s.source in self_matches and s.target in self_matches
                 for s in self_matches if isinstance(s, Edge)
@@ -554,12 +530,12 @@ class Graph:
             )
 
             # print_stack_indented(f"match_subgraphs({matches})")
-            if self_matches == (self.nodes | self.edges):
+            if self_matches == self.elements:
                 # print_stack_indented(f"<- {matches}")
                 yield matches
                 return
-            rem_self_nodes = self.nodes - self_matches
-            rem_other_nodes = other.nodes - other_matches
+            rem_self_nodes = self_nodes - self_matches
+            rem_other_nodes = other_nodes - other_matches
             for self_node in rem_self_nodes:
                 for other_node in rem_other_nodes:
                     # If the nodes don't match
@@ -595,7 +571,7 @@ class Graph:
         """
         # print_stack_indented(f"match{(self, other)}")
         for matches in self.detailed_match(other):
-            g = Graph(*matches.values())
+            g = Graph(set(matches.values()))
             # print_stack_indented(f"<- {g}")
             yield g
 
@@ -626,8 +602,8 @@ class Graph:
             A new graph with the elements grafted onto it,
             or None if there were no matches.
         """
-        marked_nodes = {e for e in other.marked if isinstance(e, Node)}
-        marked_edges = {e for e in other.marked if isinstance(e, Edge)}
+        marked_nodes = other.get_marked_nodes()
+        marked_edges = other.get_marked_edges()
 
         edges_internal = {
             edge for edge in marked_edges
@@ -637,8 +613,8 @@ class Graph:
 
         edges_to_add = None
         for matches in Graph(
-            nodes=other.nodes - marked_nodes,
-            edges=other.edges - marked_edges
+            other.elements - marked_nodes - marked_edges -
+            other.get_incident_edges(marked_nodes)
         ).detailed_match(self):
             if edges_to_add is None:
                 edges_to_add = edges_internal
@@ -656,7 +632,7 @@ class Graph:
             }
 
         return None if edges_to_add is None \
-            else copy(self).add(nodes=marked_nodes, edges=edges_to_add)
+            else copy(self).add(marked_nodes | edges_to_add)
 
     def prune(self, other: "Graph"):
         """
@@ -676,7 +652,5 @@ class Graph:
         for matches in other.detailed_match(self):
             if pruned is None:
                 pruned = copy(self)
-            pruned.remove(*(
-                matches[element] for element in other.marked
-            ))
+            pruned.remove({matches[element] for element in other.marked})
         return pruned

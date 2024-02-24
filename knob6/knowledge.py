@@ -2,7 +2,7 @@
 KNOB - The knowledge graph pattern
 """
 
-from typing import Optional, Tuple, Self
+from typing import Optional, Tuple, Self, cast
 from knob6.misc import AttrTypes, attrs_repr
 from . import directed
 
@@ -497,22 +497,22 @@ class Graph:
 
     def to_dg(self) -> directed.Graph:
         """Convert the knowledge graph pattern to a directed graph"""
-        ids_nodes = {
+        ids_elements: dict[int, directed.Elements] = {
             id: directed.Node(**element.attrs)
             for id, element in self.elements.items()
             if isinstance(element, Node)
         }
-        ids_edges = {
-            id: directed.Edge(ids_nodes[element.source],
-                              ids_nodes[element.target],
-                              **element.attrs)
+        ids_elements |= {
+            id: directed.Edge(
+                cast(directed.Node, ids_elements[element.source]),
+                cast(directed.Node, ids_elements[element.target]),
+                **element.attrs
+            )
             for id, element in self.elements.items()
             if isinstance(element, Function) and element.is_complete()
         }
-        ids_elements = ids_nodes | ids_edges
         return directed.Graph(
-            nodes=set(ids_nodes.values()),
-            edges=set(ids_edges.values()),
+            elements=set(ids_elements.values()),
             marked={ids_elements[id] for id in self.marked}
         )
 
