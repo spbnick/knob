@@ -4,6 +4,7 @@ KNOB - The knowledge graph pattern
 
 from typing import Optional, Tuple, Self
 from knob6.misc import AttrTypes, attrs_repr
+from . import directed
 
 # Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal,no-else-return
@@ -493,6 +494,27 @@ class Graph:
             ("", "+")[self.marked.get(id, False)] + "".join(element_reprs[id])
             for id in (entity_ids + relation_ids + function_ids)
         ) + f" > {element_reprs[self.right][0]}"
+
+    def to_dg(self) -> directed.Graph:
+        """Convert the knowledge graph pattern to a directed graph"""
+        ids_nodes = {
+            id: directed.Node(**element.attrs)
+            for id, element in self.elements.items()
+            if isinstance(element, Node)
+        }
+        ids_edges = {
+            id: directed.Edge(ids_nodes[element.source],
+                              ids_nodes[element.target],
+                              **element.attrs)
+            for id, element in self.elements.items()
+            if isinstance(element, Function) and element.is_complete()
+        }
+        ids_elements = ids_nodes | ids_edges
+        return directed.Graph(
+            nodes=set(ids_nodes.values()),
+            edges=set(ids_edges.values()),
+            marked={ids_elements[id] for id in self.marked}
+        )
 
     def with_replaced_element(
         self, old: GraphElements, new: GraphElements

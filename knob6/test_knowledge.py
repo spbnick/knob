@@ -2,6 +2,7 @@
 import pytest
 from knob6.knowledge import \
     EntityGraph as E, RelationGraph as R, FunctionGraph as F
+from knob6.directed import Graph as DG
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
@@ -330,4 +331,24 @@ def test_multidigit_ids():
         'r9:(source=e9, target=e10), '
         'r10:(source=e10, target=e1) '
         '> e10'
+    )
+
+
+def test_to_dg():
+    assert repr((+(E(a=1) >> E(b=2))).to_dg()) == (
+        "{"
+        "+n1(a=1), +n2, +n3(b=2), "
+        "+e1[n2->n1](_type='source'), "
+        "+e2[n2->n3](_type='target')"
+        "}"
+    )
+
+
+def test_graft():
+    assert repr(DG().graft((+(E(a=1) >> E(b=2))).to_dg())) == (
+        "{"
+        "n1(a=1), n2, n3(b=2), "
+        "e1[n2->n1](_type='source'), "
+        "e2[n2->n3](_type='target')"
+        "}"
     )
