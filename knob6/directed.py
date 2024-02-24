@@ -149,7 +149,7 @@ class Graph:
 
         Args:
             elements:   A tuple of graph elements (nodes or edges).
-                        Nodes references by edges in this tuple are also added
+                        Nodes referenced by edges in this tuple are also added
                         to the graph.
             nodes:      A set of nodes to add to the elements,
                         or None for empty set.
@@ -218,7 +218,7 @@ class Graph:
 
         Args:
             elements:   A tuple of graph elements (nodes or edges).
-                        Nodes references by edges in this tuple are also added
+                        Nodes referenced by edges in this tuple are also added
                         to the graph.
             nodes:      A set of nodes to add to the elements,
                         or None for empty set.
