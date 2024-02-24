@@ -168,12 +168,18 @@ class Graph:
         self.add(*elements, nodes=nodes, edges=edges, marked=marked)
 
     def __hash__(self):
-        return hash((frozenset(self.nodes), frozenset(self.edges)))
+        return hash((frozenset(self.nodes),
+                     frozenset(self.edges),
+                     frozenset(self.marked)))
 
     def __eq__(self, other):
         if not isinstance(other, Graph):
             return NotImplemented
-        return self.nodes == other.nodes and self.edges == other.edges
+        return (
+            self.nodes == other.nodes and
+            self.edges == other.edges and
+            self.marked == other.marked
+        )
 
     def __repr__(self):
         # A map of nodes and their representations
