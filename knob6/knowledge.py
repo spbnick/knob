@@ -345,6 +345,16 @@ class Function(Edge):
             "]"
         )
 
+    def is_complete(self):
+        """
+        Check if the function is complete, that is if it has source, target,
+        and _type attribute.
+
+        Returns:
+            True if the function is complete, False otherwise.
+        """
+        return self.source and self.target and "_type" in self.attrs
+
 
 # Element pattern types operated by the graph pattern
 GRAPH_ELEMENTS = (Entity, Relation, Function)
@@ -427,9 +437,7 @@ class Graph:
                 relation_ids.append(id)
                 element_reprs[id] = (f"r{len(relation_ids)}",)
             elif isinstance(element, Function):
-                # Skip complete functions
-                if element.source and element.target and \
-                   "_type" in element.attrs:
+                if element.is_complete():
                     continue
                 function_ids.append(id)
                 element_reprs[id] = (f"f{len(function_ids)}",)
@@ -442,9 +450,7 @@ class Graph:
         for id, element in self.elements.items():
             if not isinstance(element, Function):
                 continue
-            # If the function is complete
-            if element.source and element.target and \
-               "_type" in element.attrs:
+            if element.is_complete():
                 relation_functions[element.source].append((
                     ("", "+")[self.marked.get(id, False)],
                     element.attrs["_type"],
