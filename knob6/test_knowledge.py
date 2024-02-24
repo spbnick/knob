@@ -352,3 +352,10 @@ def test_graft():
         "e2[n2->n3](_type='target')"
         "}"
     )
+    assert repr(DG() ** +(E(a=1) >> E(b=2))) == (
+        "{"
+        "n1(a=1), n2, n3(b=2), "
+        "e1[n2->n1](_type='source'), "
+        "e2[n2->n3](_type='target')"
+        "}"
+    )

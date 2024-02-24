@@ -654,6 +654,13 @@ class Graph:
         return None if edges_to_add is None \
             else copy(self).add(marked_nodes | edges_to_add)
 
+    def __pow__(self, other):
+        """Graft the other graph onto this one"""
+        other = self.coerce(other)
+        if isinstance(other, Graph):
+            return self.graft(other)
+        return NotImplemented
+
     def prune(self, other: "Graph"):
         """
         Prune another graph from this one by matching, and removing the
@@ -674,3 +681,10 @@ class Graph:
                 pruned = copy(self)
             pruned.remove({matches[element] for element in other.marked})
         return pruned
+
+    def __floordiv__(self, other):
+        """Prune the other graph from this one"""
+        other = self.coerce(other)
+        if isinstance(other, Graph):
+            return self.prune(other)
+        return NotImplemented

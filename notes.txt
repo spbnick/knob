@@ -1793,3 +1793,40 @@ bit 0   1   2   3
 
 TODO: Check that relation role names are unique, in graph patterns.
     - or maybe not?
+---
+
+Wait, we might be better off with a different set of operators.
+It might be better to assign logical (binary) operators to simple set
+operations, and the arithmetic operators to graph matching operations.
+So:
+
+    # Add G2 elements to G1 (or vice versa)
+    G1 | G2
+
+    # Produce graph with elements in both G1 and G2
+    G1 & G2
+
+    # Produce graph with elements not shared by G1 and G2
+    G1 ^ G2
+
+    # Match unmarked and add marked parts of G2 to G1
+    G1 + G2
+
+    # Match the complete G2 and remove its marked parts from G1
+    G1 - G2
+
+Or perhaps, for the last two:
+
+    # Match unmarked and add marked parts of G2 to G1
+    G1 ** G2
+
+    # Match the complete G2 and remove its marked parts from G1
+    G1 // G2
+
+This would show that the operations are noncommutative, and the normal use,
+building a knowledge graph, would look like this:
+
+G **= s.Advertising >> +t >> s.Standby |
+      s.Advertising << +t << s.Standby |
+      s.Advertising >> +t >> e.role.Peripheral
+
