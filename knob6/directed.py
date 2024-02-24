@@ -253,6 +253,36 @@ class Graph:
         self.marked |= other.marked
         return self
 
+    def __and__(self, other):
+        other = self.coerce(other)
+        if not isinstance(other, Graph):
+            return NotImplemented
+        return Graph(elements=self.elements & other.elements,
+                     marked=self.marked & other.marked)
+
+    def __iand__(self, other):
+        other = self.coerce(other)
+        if not isinstance(other, Graph):
+            return NotImplemented
+        self.elements &= other.elements
+        self.marked &= other.marked
+        return self
+
+    def __xor__(self, other):
+        other = self.coerce(other)
+        if not isinstance(other, Graph):
+            return NotImplemented
+        return Graph(elements=self.elements ^ other.elements,
+                     marked=self.marked ^ other.marked)
+
+    def __ixor__(self, other):
+        other = self.coerce(other)
+        if not isinstance(other, Graph):
+            return NotImplemented
+        self.elements ^= other.elements
+        self.marked ^= other.marked
+        return self
+
     def add(self,
             elements: Optional[set[Elements]] = None,
             marked: Optional[set[Elements]] = None) -> Self:

@@ -1815,7 +1815,7 @@ So:
     # Match the complete G2 and remove its marked parts from G1
     G1 - G2
 
-Or perhaps, for the last two:
+Or perhaps, for the last two, instead:
 
     # Match unmarked and add marked parts of G2 to G1
     G1 ** G2
