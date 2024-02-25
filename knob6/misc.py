@@ -13,7 +13,7 @@ def print_stack_indented(*args, **kwargs):
 
 
 # Accepted attribute value types
-AttrTypes = Union[str, int]
+AttrTypes = Union[str, int, bool]
 
 
 def attrs_repr(attrs: dict[str, AttrTypes]):
