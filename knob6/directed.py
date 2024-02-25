@@ -140,6 +140,9 @@ Elements = Node | Edge
 class Graph:
     """A directed graph"""
 
+    class Mismatch(Exception):
+        """Graph didn't match the pattern"""
+
     def __init__(self,
                  elements: Optional[set[Elements]] = None,
                  marked: Optional[set[Elements]] = None):
@@ -652,7 +655,7 @@ class Graph:
         """
         return bool(next(self.detailed_match(other), False))
 
-    def graft(self, other: "Graph"):
+    def graft(self, other: "Graph") -> Self:
         """
         Graft another graph onto this one, adding marked elements from the
         other graph, connecting the nodes matching the rest.
@@ -664,8 +667,10 @@ class Graph:
                         "marked" elements will be connected.
 
         Returns:
-            A new graph with the elements grafted onto it,
-            or None if there were no matches.
+            A new graph with the elements grafted onto it.
+
+        Raises:
+            Graph.Mismatch: the graph didn't match the other graph.
         """
         marked_nodes = other.get_marked_nodes()
         marked_edges = other.get_marked_edges()
@@ -696,8 +701,9 @@ class Graph:
                 for edge in edges_external
             }
 
-        return None if edges_to_add is None \
-            else copy(self).add(marked_nodes | edges_to_add)
+        if edges_to_add is None:
+            raise Graph.Mismatch()
+        return copy(self).add(marked_nodes | edges_to_add)
 
     def __pow__(self, other):
         """Graft the other graph onto this one"""
@@ -706,7 +712,7 @@ class Graph:
             return self.graft(other)
         return NotImplemented
 
-    def prune(self, other: "Graph"):
+    def prune(self, other: "Graph") -> Self:
         """
         Prune another graph from this one by matching, and removing the
         elements matching the specified ones.
@@ -717,14 +723,18 @@ class Graph:
                         elements matching "marked" ones will be removed.
 
         Returns:
-            A new graph with the elements pruned from it,
-            or None if there were no matches.
+            A new graph with the elements pruned from it.
+
+        Raises:
+            Graph.Mismatch: the graph didn't match the other graph.
         """
         pruned = None
         for matches in other.detailed_match(self):
             if pruned is None:
                 pruned = copy(self)
             pruned.remove({matches[element] for element in other.marked})
+        if pruned is None:
+            raise Graph.Mismatch()
         return pruned
 
     def __floordiv__(self, other):

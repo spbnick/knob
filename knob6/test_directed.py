@@ -3,6 +3,7 @@ import itertools
 import functools
 from copy import copy
 from typing import Optional
+import pytest
 from knob6.directed import Node as N, Edge as E, Graph, Elements
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
@@ -214,6 +215,7 @@ def test_match_components():
 
 def test_graft_empty_both():
     assert G().graft(G()) == G()
+    assert G() ** G() == G()
 
 
 def test_graft_empty_pattern():
@@ -223,7 +225,8 @@ def test_graft_empty_pattern():
 
 def test_graft_mismatch():
     e = E(N(x=1), N(x=2))
-    assert G().graft(G(e, marked={e})) is None
+    with pytest.raises(G.Mismatch):
+        G().graft(G(e, marked={e}))
 
 
 def test_graft_node_to_null():
@@ -239,10 +242,14 @@ def test_graft_node_to_non_null():
 
 def test_graft_edge_to_null():
     e = E(N(), N())
-    assert G().graft(G(e)) is None
-    assert G().graft(G(e, marked={e})) is None
-    assert G().graft(G(e, marked={e, e.source})) is None
-    assert G().graft(G(e, marked={e, e.target})) is None
+    with pytest.raises(G.Mismatch):
+        G().graft(G(e))
+    with pytest.raises(G.Mismatch):
+        G().graft(G(e, marked={e}))
+    with pytest.raises(G.Mismatch):
+        G().graft(G(e, marked={e, e.source}))
+    with pytest.raises(G.Mismatch):
+        G().graft(G(e, marked={e, e.target}))
     assert G().graft(G(e, marked={e, e.source, e.target})) == G(e)
 
 
@@ -253,9 +260,11 @@ def test_graft_edge_to_non_null():
     e12 = E(n1, n2)
     e13 = E(n1, n3)
     e23 = E(n2, n3)
-    assert G(n1, n2).graft(G(e12)) is None
+    with pytest.raises(G.Mismatch):
+        G(n1, n2).graft(G(e12))
     assert G(n1, n2).graft(G(e12, marked={e12})).matches(G(e12))
-    assert G(n1, n2).graft(G(e13, marked={e13})) is None
+    with pytest.raises(G.Mismatch):
+        G(n1, n2).graft(G(e13, marked={e13}))
     assert G(n1, n2).graft(G(e13, marked={e13, n3})).matches(G(e13, n2))
     assert G(n1).graft(
         G(e12, e13, e23, marked={e12, e13, e23, n2, n3})
@@ -414,4 +423,5 @@ def test_prune_empty_pattern():
 
 def test_prune_mismatch():
     e = E(N(x=1), N(x=2))
-    assert G().prune(G(e, marked={e})) is None
+    with pytest.raises(G.Mismatch):
+        G().prune(G(e, marked={e}))
