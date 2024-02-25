@@ -253,6 +253,21 @@ class Graph:
         self.marked |= other.marked
         return self
 
+    def __sub__(self, other):
+        other = self.coerce(other)
+        if not isinstance(other, Graph):
+            return NotImplemented
+        return Graph(elements=self.elements - other.elements,
+                     marked=self.marked - other.marked)
+
+    def __isub__(self, other):
+        other = self.coerce(other)
+        if not isinstance(other, Graph):
+            return NotImplemented
+        self.elements -= other.elements
+        self.marked -= other.marked
+        return self
+
     def __and__(self, other):
         other = self.coerce(other)
         if not isinstance(other, Graph):

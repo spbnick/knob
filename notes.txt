@@ -1830,3 +1830,7 @@ G **= s.Advertising >> +t >> s.Standby |
       s.Advertising << +t << s.Standby |
       s.Advertising >> +t >> e.role.Peripheral
 
+And perhaps we can use the subtraction as a set operation:
+
+    # Remove G2 elements from G1
+    G1 - G2
