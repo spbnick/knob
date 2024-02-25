@@ -256,15 +256,15 @@ def test_refs():
     x = None
 
     assert repr((x := E.x) >> +x) == \
-        'e1 < +e1.x, r1:(source=e1, target=e1) > e1'
+        'e1 < +e1.x, +r1:(+source=e1, +target=e1) > e1'
     x = None
 
     assert repr((x := +E.x) >> -x) == \
-        'e1 < e1.x, r1:(source=e1, target=e1) > e1'
+        'e1 < e1.x, +r1:(+source=e1, +target=e1) > e1'
     x = None
 
     assert repr(+(x := E.x) >> x) == \
-        'e1 < +e1.x, r1:(source=e1, target=e1) > e1'
+        'e1 < +e1.x, +r1:(+source=e1, +target=e1) > e1'
     x = None
 
     assert repr((x := E.x >> E.y) >> x) == (

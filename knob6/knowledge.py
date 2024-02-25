@@ -631,6 +631,8 @@ class Graph:
             raise ValueError
 
         combined = left | right
+        if combined.marked.get(left.right) or combined.marked.get(right.left):
+            combined.marked[function.id] = True
         function = combined.elements[function.id]
         return combined.with_replaced_element(
             *function.with_updated_endpoints(target=node.id)
@@ -686,6 +688,8 @@ class Graph:
             raise ValueError
 
         combined = left | right
+        if combined.marked.get(left.right) or combined.marked.get(right.left):
+            combined.marked[function.id] = True
         function = combined.elements[function.id]
         return combined.with_replaced_element(
             *function.with_updated_endpoints(source=relation.id)
@@ -717,6 +721,8 @@ class Graph:
            isinstance(left_element, Relation) and \
            isinstance(right_element, Relation):
             relation = RelationGraph()
+            if left.marked.get(left.right) or right.marked.get(right.left):
+                relation = +relation
             if ltr:
                 return left - "source" * relation * "target" - right
             else:
