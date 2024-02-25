@@ -753,7 +753,21 @@ class Graph:
         return self._shift(other, "<<", self)
 
 
-class EntityGraph(Graph):
+class MetaElementGraph(type):
+    """A single-element graph pattern metaclass"""
+
+    def __getattr__(cls, key: str) -> Graph:
+        return cls()[key]
+
+    def __getitem__(cls, key) -> Graph:
+        return cls()[key]
+
+
+class ElementGraph(Graph, metaclass=MetaElementGraph):
+    """A single-element graph pattern"""
+
+
+class EntityGraph(ElementGraph):
     """A single-entity graph pattern"""
 
     def __init__(self, **attrs: AttrTypes):
@@ -767,7 +781,7 @@ class EntityGraph(Graph):
         super().__init__({ep.id: ep}, {}, ep.id, ep.id)
 
 
-class RelationGraph(Graph):
+class RelationGraph(ElementGraph):
     """A single-relation graph pattern"""
 
     def __init__(self, **attrs: AttrTypes):
@@ -781,7 +795,7 @@ class RelationGraph(Graph):
         super().__init__({rp.id: rp}, {}, rp.id, rp.id)
 
 
-class FunctionGraph(Graph):
+class FunctionGraph(ElementGraph):
     """A single-function graph pattern"""
 
     def __init__(self, type: Optional[str] = None):
