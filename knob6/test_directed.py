@@ -360,29 +360,32 @@ def disabled_test_graft_connect_two_subgraphs():
         E(np[0][cycle][1], np[1][cycle][1])
         for cycle in cycles
     }
-    gp = G(*itertools.chain(
-        # Make the cycle patterns
-        (
-            E(np[side][cycle][node],
-              np[side][cycle][(node + 1) % len(nodes)])
-            for side in sides
-            for cycle in cycles
-            for node in nodes
+    gp = G(
+        *itertools.chain(
+            # Make the cycle patterns
+            (
+                E(np[side][cycle][node],
+                  np[side][cycle][(node + 1) % len(nodes)])
+                for side in sides
+                for cycle in cycles
+                for node in nodes
+            ),
+            # Mention the nodes connected between cycles
+            (
+                E(np[0][cycle][0], np[1][cycle][0])
+                for cycle in cycles
+            ),
+            add_edges,
         ),
-        # Mention the nodes connected between cycles
-        (
-            E(np[0][cycle][0], np[1][cycle][0])
-            for cycle in cycles
-        ),
-        add_edges,
-    ))
+        marked=add_edges
+    )
     print("G")
     print(g.graphviz())
     print("GP")
     print(gp.graphviz())
     print("GRAFTED")
     # FIXME: Takes a long time
-    grafted = g.graft(gp, *add_edges)
+    grafted = g ** gp
     assert grafted is not None
     print(grafted.graphviz())
     print("GRAFTED_PATTERN")
