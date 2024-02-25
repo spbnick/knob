@@ -667,7 +667,7 @@ class Graph:
                         "marked" elements will be connected.
 
         Returns:
-            A new graph with the elements grafted onto it.
+            The graph with the elements grafted onto it.
 
         Raises:
             Graph.Mismatch: the graph didn't match the other graph.
@@ -703,10 +703,17 @@ class Graph:
 
         if edges_to_add is None:
             raise Graph.Mismatch()
-        return copy(self).add(marked_nodes | edges_to_add)
+        return self.add(marked_nodes | edges_to_add)
 
     def __pow__(self, other):
         """Graft the other graph onto this one"""
+        other = self.coerce(other)
+        if isinstance(other, Graph):
+            return copy(self).graft(other)
+        return NotImplemented
+
+    def __ipow__(self, other):
+        """Graft the other graph onto this one, in-place"""
         other = self.coerce(other)
         if isinstance(other, Graph):
             return self.graft(other)
@@ -731,7 +738,7 @@ class Graph:
         pruned = None
         for matches in other.detailed_match(self):
             if pruned is None:
-                pruned = copy(self)
+                pruned = self
             pruned.remove({matches[element] for element in other.marked})
         if pruned is None:
             raise Graph.Mismatch()
@@ -739,6 +746,13 @@ class Graph:
 
     def __floordiv__(self, other):
         """Prune the other graph from this one"""
+        other = self.coerce(other)
+        if isinstance(other, Graph):
+            return copy(self).prune(other)
+        return NotImplemented
+
+    def __ifloordiv__(self, other):
+        """Prune the other graph from this one, in-place"""
         other = self.coerce(other)
         if isinstance(other, Graph):
             return self.prune(other)

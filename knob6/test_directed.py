@@ -220,7 +220,7 @@ def test_graft_empty_both():
 
 def test_graft_empty_pattern():
     g = G(E(N(x=1), N(x=2)))
-    assert g.graft(G()) == g
+    assert g ** G() == g
 
 
 def test_graft_mismatch():
@@ -418,7 +418,7 @@ def test_prune_empty_both():
 
 def test_prune_empty_pattern():
     g = G(E(N(x=1), N(x=2)))
-    assert g.prune(G()) == g
+    assert g // G() == g
 
 
 def test_prune_mismatch():
