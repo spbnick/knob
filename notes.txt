@@ -1834,3 +1834,142 @@ And perhaps we can use the subtraction as a set operation:
 
     # Remove G2 elements from G1
     G1 - G2
+---
+We would like to store shortcuts for particular elements before using them in
+patterns. Like have a state transition relationship which we can instantiate
+multiple times in a pattern.
+
+Perhaps we can have an operator which gives a boundary a new ID? Maybe the '~'
+operator? Or rather generates new IDs for *every* element in the graph
+pattern? Hmm...
+
+I think we need to make it clearer, and easier to identify, when new element
+instances are created.
+
+Another thing is that we need a way to export the resulting directed graph not
+as just directed graph, but as a knowledge hypergraph. E.g. to graphviz,
+neo4j, TypeDB, and so on. How do we express that via classes, methods, and
+functions?
+
+Would also be good to add support for using lists of graph patterns as graph
+patterns, in operations. Looks like it could be good to do via coercion.
+That also will require supporting multiple elements per boundary. Or a special
+subclass of graph pattern, something like "multi graph pattern". Not to
+confuse with "multigraph".
+---
+
+OK, we want to be able to reuse some elements as templates, or as many times
+as we want, without them all being considered as the same node. At the same
+time we want to be able to express having the same node in different places in
+the graph pattern.
+
+Can we flip the current situation and consider all elements as different,
+unless specified otherwise? How would that work?
+
+Assign a new ID to each element when graphs are merged?
+
+How would that work?
+
+Let's try:
+---
+the_device = ~E[""].Device
+s = E.ll_state
+r = E.role
+t = R.ll_state_transition
+
+g **= (
+    +the_device |
+    +s.Advertising(
+        implementation_required=True,
+        comment="Device in this state is an \"advertiser\", and is "
+                "transmitting advertising physical channel packets, "
+                "and listening and responding to responses."
+    ) >> +r.Advertiser << the_device |
+    +s.Scanning(
+        implementation_required=True,
+        comment="Device in this state is a \"scanner\", and is listening for "
+                "advertising physical channel packets from devices that are "
+                "advertising. This state can be entered from the Standby state."
+    ) >> +r.Scanner << the_device |
+    +s.Standby(
+        comment="The Link Layer in the Standby state does not transmit or "
+                "receive any packets. The Standby state can be entered from "
+                "any other state."
+    ) |
+    +s.Initiating(
+        comment="The Link Layer in the Initiating state will be listening for "
+                "advertising physical channel packets from a specific device(s) "
+                "and responding to these packets to initiate a connection with "
+                "another device. A device in the Initiating state is known as an "
+                "initiator. The Initiating state can be entered from the Standby "
+                "state."
+    ) >> +r.Initiator << the_device |
+    +s.Connection(
+        comment="The Connection state can be entered either from the Initiating "
+                "state or the Advertising state. A device in the Connection "
+                "state is known as being in a connection."
+    ) >> +r["In a Connection"] << the_device |
+    +s.Synchronization(
+        comment="The Link Layer in the Synchronization State will be listening "
+                "for periodic physical channel packets forming a specific "
+                "periodic advertising train, coming from a specified device that "
+                "is transmitting periodic advertising. The Synchronization State "
+                "can be entered from the Standby State. While in this State, the "
+                "Host may direct the Link Layer to listen for isochronous data "
+                "packets coming from a specified device that is transmitting a "
+                "Broadcast Isochronous Group (BIG). A device that is in the "
+                "Synchronization State and is receiving isochronous data packets "
+                "is referred to as a Synchronized Receiver."
+    ) >> +r["Synchronized Receiver"] << the_device |
+    +s["Isochronous Broadcasting"](
+        comment="The Link Layer in the Isochronous Broadcasting State will "
+                "transmit isochronous data packets on an isochronous physical "
+                "channel. The Isochronous Broadcasting State can be entered from "
+                "the Standby State. A device that is in the Isochronous "
+                "Broadcasting State is referred to as an Isochronous Broadcaster."
+    ) >> +r["Isochronous Broadcaster"] << the_device
+)
+
+g **= s.Advertising >> +t >> s.Standby
+g **= s.Advertising << +t << s.Standby
+g **= s.Advertising >> +t >> +r.Peripheral(
+    comment="The Link Layer in the Peripheral Role will communicate with a "
+            "single device in the Central Role."
+) << the_device
+
+g **= s["Isochronous Broadcasting"] >> +t >> s.Standby
+g **= s["Isochronous Broadcasting"] << +t << s.Standby
+g **= (x := ~s.Scanning) >> +t >> s.Standby >> +t >> x
+g **= (x := s.Synchronization) >> +t >> s.Standby >> +t >> x
+
+g **= (x := ~s.Initiating) >> +t >> s.Standby >> +t >> x >> +t >> +r.Central(
+    comment="The Link Layer in the Central Role will communicate with a "
+            "device in the Peripheral Role and define the timings of "
+            "transmissions."
+) << the_device
+
+g **= s.Connection >> +R() >> r.Central >> +t >> s.Standby
+g **= s.Connection >> +R() >> r.Peripheral >> +t >> s.Standby
+
+g **= (
+    the_device >> +(x := ~R.identified_by) |
+    x >> +E[""]["Device Address Type"] |
+    x >> +E[""]["Device Address"]
+)
+
+E[""]["Device Address"] << +R.type_of << +F.identified_by << E[""]["Device Address Type"]
+---
+
+OK, this seems to be better... Let's try implementing it.
+
+How about we dedicate the zero bit of the element ID to signify either a
+dynamic ID, which is reassigned on each graph merge, or a constant ID, which
+is sequentially generated and is preserved? With zero meaning dynamic and one
+meaning constant. Then each element can start with ID zero, being dynamic. And
+on the '~' operation would get the next constant ID and keep it through
+operations. This way also the graph would assign both the dynamic and the
+constant IDs, and we could take them out of the elements themselves.
+
+Ah, wait we need the zero ID for signifying "no element/ID", and since it's a
+sort of a constant ID, we would consider all even IDs (with bit zero being
+zero) constant IDs, and odd IDs being dynamic.

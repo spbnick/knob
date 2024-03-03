@@ -2,7 +2,7 @@
 KNOB - The knowledge graph pattern
 """
 
-from typing import Optional, Tuple, Self, cast
+from typing import Optional, Self, cast
 from knob6.misc import AttrTypes, attrs_repr
 from . import directed
 
@@ -15,15 +15,7 @@ class Element:
     """An abstract element (node or edge) pattern"""
 
     # The tuple of the names of implicit attributes in order of nesting
-    IMPLICIT_ATTRS: Tuple[str, ...] = ("_type",)
-
-    # The ID next created element pattern can use
-    __NEXT_ID = 1
-
-    @classmethod
-    def is_valid_id(cls, id: int):
-        """Check if an ID is valid for instances of this class"""
-        return id > 0
+    IMPLICIT_ATTRS: tuple[str, ...] = ("_type",)
 
     @classmethod
     def are_attrs_valid(cls, attrs: dict[str, AttrTypes]):
@@ -31,25 +23,13 @@ class Element:
         assert isinstance(attrs, dict)
         return True
 
-    def __init__(self, id: int, attrs: dict[str, AttrTypes]):
+    def __init__(self, attrs: dict[str, AttrTypes]):
         """
         Initialize the element pattern.
 
         Args:
-            id:     The element ID.
-                    Must be positive.
-                    Zero to assign next available.
             attrs:  The attribute dictionary.
         """
-        assert self.is_valid_id(id)
-        if id == 0:
-            id = Element.__NEXT_ID
-        else:
-            assert Element.is_valid_id(id)
-            Element.__NEXT_ID = max(id, Element.__NEXT_ID)
-        self.id = id
-        Element.__NEXT_ID += 1
-
         # Substitute implicit attrs
         if "" in attrs:
             for implicit_attr in self.IMPLICIT_ATTRS:
@@ -64,8 +44,7 @@ class Element:
 
         self.attrs = attrs
 
-    def with_updated_attrs(self, attrs: dict[str, AttrTypes]) -> \
-            Tuple[Self, Self]:
+    def with_updated_attrs(self, attrs: dict[str, AttrTypes]) -> Self:
         """
         Duplicate the pattern with updated attributes.
 
@@ -73,9 +52,9 @@ class Element:
             attrs:  The attribute dictionary to update with.
 
         Returns:
-            The self and the updated pattern.
+            The updated pattern.
         """
-        return self, type(self)(self.id, self.attrs | attrs)
+        return type(self)(self.attrs | attrs)
 
     def attrs_repr(self):
         """Generate a string representation of element attributes"""
@@ -93,45 +72,12 @@ class Element:
             result += attrs_repr(explicit_attrs)
         return result
 
-    @classmethod
-    def ref_repr(cls, id: int):
-        """Format a reference representation of a pattern ID"""
-        assert cls.is_valid_id(id)
-        return f"{cls.__name__}#{id}"
-
     def __repr__(self):
-        return self.ref_repr(self.id) + self.attrs_repr()
+        return self.__class__.__name__ + self.attrs_repr()
 
 
 class Node(Element):
     """A node pattern"""
-
-    # The ID next created node pattern can use
-    # Cannot ever match edge pattern IDs
-    __NEXT_ID = 1
-
-    @classmethod
-    def is_valid_id(cls, id: int):
-        """Check if an ID is valid for instances of this class"""
-        return super().is_valid_id(id) and (id & 1) == 1
-
-    def __init__(self, id: int, attrs: dict[str, AttrTypes]):
-        """
-        Initialize the node pattern.
-
-        Args:
-            id:     The node ID.
-                    Must be odd and positive.
-                    Zero to assign next available.
-            attrs:  The attribute dictionary.
-        """
-        if id == 0:
-            id = Node.__NEXT_ID
-        else:
-            assert Node.is_valid_id(id)
-            Node.__NEXT_ID = max(id, Node.__NEXT_ID)
-        Node.__NEXT_ID += 2
-        super().__init__(id, attrs)
 
     def __or__(self, other) -> Self:
         """Merge two instances of the pattern together"""
@@ -139,134 +85,49 @@ class Node(Element):
             return self
         if not isinstance(other, type(self)):
             return NotImplemented
-        if other.id != self.id:
-            raise ValueError
-        return type(self)(self.id, self.attrs | other.attrs)
+        return type(self)(self.attrs | other.attrs)
 
 
 class Entity(Node):
     """An entity pattern"""
 
     # The tuple of the names of implicit attributes in order of nesting
-    IMPLICIT_ATTRS: Tuple[str, ...] = Node.IMPLICIT_ATTRS + ("_name",)
-
-    # The ID next created entity pattern can use
-    __NEXT_ID = 1
-
-    @classmethod
-    def is_valid_id(cls, id: int):
-        """Check if an ID is valid for instances of this class"""
-        return super().is_valid_id(id) and (id & 3) == 1
-
-    def __init__(self, id: int, attrs: dict[str, AttrTypes]):
-        """
-        Initialize the entity pattern.
-
-        Args:
-            id:     The entity ID.
-                    Must be positive and conform to id % 4 == 1.
-                    Zero to assign next available.
-            attrs:  The attribute dictionary.
-        """
-        if id == 0:
-            id = Entity.__NEXT_ID
-        else:
-            assert Entity.is_valid_id(id)
-            Entity.__NEXT_ID = max(id, Entity.__NEXT_ID)
-        Entity.__NEXT_ID += 4
-        super().__init__(id, attrs)
-
-    @classmethod
-    def ref_repr(cls, id: int):
-        """Format a reference representation of a pattern ID"""
-        assert cls.is_valid_id(id)
-        return f"e#{id}"
+    IMPLICIT_ATTRS: tuple[str, ...] = Node.IMPLICIT_ATTRS + ("_name",)
 
 
 class Relation(Node):
     """A relation pattern"""
 
-    # The ID next created relation pattern can use
-    __NEXT_ID = 3
-
-    @classmethod
-    def is_valid_id(cls, id: int):
-        """Check if an ID is valid for instances of this class"""
-        return super().is_valid_id(id) and (id & 3) == 3
-
-    def __init__(self, id: int, attrs: dict[str, AttrTypes]):
-        """
-        Initialize the relation pattern.
-
-        Args:
-            id:     Relation ID.
-                    Must be positive and conform to id % 4 == 3.
-                    Zero to assign next available.
-            attrs:  The attribute dictionary.
-        """
-        if id == 0:
-            id = Relation.__NEXT_ID
-        else:
-            assert Relation.is_valid_id(id)
-            Relation.__NEXT_ID = max(id, Relation.__NEXT_ID)
-        Relation.__NEXT_ID += 4
-        super().__init__(id, attrs)
-
-    @classmethod
-    def ref_repr(cls, id: int):
-        """Format a reference representation of a pattern ID"""
-        assert cls.is_valid_id(id)
-        return f"r#{id}"
-
 
 class Edge(Element):
     """An edge pattern"""
 
-    # The ID next created edge pattern can use
-    # Cannot ever match node pattern IDs
-    __NEXT_ID = 2
-
-    @classmethod
-    def is_valid_id(cls, id: int):
-        """Check if an ID is valid for instances of this class"""
-        return super().is_valid_id(id) and (id & 1) == 0
-
-    def __init__(self, id: int, attrs: dict[str, AttrTypes],
+    def __init__(self, attrs: dict[str, AttrTypes],
                  source: int = 0, target: int = 0):
         """
         Initialize the edge pattern.
 
         Args:
-            id:     The edge ID.
-                    Must be even and positive.
-                    Zero to assign next available.
             attrs:  The attribute dictionary.
             source: The ID of the source node, or zero if none.
             target: The ID of the target node, or zero if none.
         """
-        assert source == 0 or Node.is_valid_id(source)
-        assert target == 0 or Node.is_valid_id(target)
-        if id == 0:
-            id = Edge.__NEXT_ID
-        else:
-            assert Edge.is_valid_id(id)
-            Edge.__NEXT_ID = max(id, Edge.__NEXT_ID)
-        Edge.__NEXT_ID += 2
-        super().__init__(id, attrs)
+        super().__init__(attrs)
         self.source = source
         self.target = target
 
     def __repr__(self):
         return super().__repr__() + (
             "[" +
-            (Node.ref_repr(self.source) if self.source else "-") +
-            (Node.ref_repr(self.target) if self.target else "-") +
+            (f"#{self.source}" if self.source else "") +
+            "->" +
+            (f"#{self.target}" if self.target else "") +
             "]"
         )
 
     def with_updated_endpoints(
         self, source: int = 0, target: int = 0
-    ) -> Tuple[Self, Self]:
+    ) -> Self:
         """
         Duplicate the pattern with endpoints updated
 
@@ -275,10 +136,9 @@ class Edge(Element):
             target: The ID of the target node, or zero to keep original.
 
         Returns:
-            Self and the updated pattern.
+            The updated pattern.
         """
-        return self, type(self)(
-            self.id,
+        return type(self)(
             self.attrs,
             source or self.source,
             target or self.target
@@ -290,10 +150,7 @@ class Edge(Element):
             return self
         if not isinstance(other, type(self)):
             return NotImplemented
-        if other.id != self.id:
-            raise ValueError
         return type(self)(
-            self.id,
             self.attrs | other.attrs,
             other.source or self.source,
             other.target or self.target
@@ -312,37 +169,27 @@ class Function(Edge):
             isinstance(attrs["_type"], str)
         )
 
-    def __init__(self, id: int, attrs: dict[str, AttrTypes],
+    def __init__(self, attrs: dict[str, AttrTypes],
                  source: int = 0, target: int = 0):
         """
         Initialize the function edge pattern.
 
         Args:
-            id:     The function ID.
-                    Must be even and positive.
-                    Zero to assign next available.
             attrs:  The attribute dictionary.
                     Can only be empty or contain the "_type" string attribute.
             source: The ID of the source relation, or zero if none.
             target: The ID of the target node, or zero if none.
         """
         assert isinstance(attrs, dict)
-        assert source == 0 or Relation.is_valid_id(source)
-        assert target == 0 or Node.is_valid_id(target)
-        super().__init__(id, attrs, source, target)
-
-    @classmethod
-    def ref_repr(cls, id: int):
-        """Format a reference representation of a pattern ID"""
-        assert cls.is_valid_id(id)
-        return f"f#{id}"
+        super().__init__(attrs, source, target)
 
     def __repr__(self):
-        return self.ref_repr(self.id) + repr(self.attrs["_type"]) + (
+        return self.__class__.__name__ + "." + (
+            repr(self.attrs.get("_type")) +
             "[" +
-            (Relation.ref_repr(self.source) if self.source else "") +
+            (f"#{self.source}" if self.source else "") +
             "->" +
-            (Node.ref_repr(self.target) if self.target else "") +
+            (f"#{self.target}" if self.target else "") +
             "]"
         )
 
@@ -364,6 +211,26 @@ GraphElements = Entity | Relation | Function
 
 class Graph:
     """A graph pattern"""
+
+    # Next available static ID
+    __NEXT_STATIC_ID = 2
+
+    @classmethod
+    def is_valid_id(cls, id):
+        """Check if an element ID is valid (a non-zero integer)"""
+        return isinstance(id, int) and bool(id)
+
+    @classmethod
+    def is_dynamic_id(cls, id):
+        """Check if an element ID is dynamic (odd)"""
+        assert cls.is_valid_id(id)
+        return bool(id & 1)
+
+    @classmethod
+    def is_static_id(cls, id):
+        """Check if an element ID is static (even)"""
+        assert cls.is_valid_id(id)
+        return not id & 1
 
     def __init__(self,
                  elements: dict[int, GraphElements],
@@ -392,20 +259,18 @@ class Graph:
                         Cannot reference a complete function.
         """
         assert isinstance(elements, dict)
-        assert left != 0
-        assert right != 0
+        assert self.is_valid_id(left)
+        assert self.is_valid_id(right)
         assert all(
-            isinstance(id, int) and
-            isinstance(e, GRAPH_ELEMENTS) and
-            id == e.id
+            self.is_valid_id(id) and isinstance(e, GRAPH_ELEMENTS)
             for id, e in elements.items()
         )
         assert isinstance(marked, dict)
         assert set(marked) <= set(elements)
         assert all(isinstance(m, bool) for m in marked.values())
         assert all(
-            (not e.source or e.source in elements) and
-            (not e.target or e.target in elements)
+            (not e.source or isinstance(elements.get(e.source), Relation)) and
+            (not e.target or isinstance(elements.get(e.target), Node))
             for e in elements.values() if isinstance(e, Function)
         ), "A function references an unknown node"
 
@@ -517,37 +382,88 @@ class Graph:
         )
 
     def with_replaced_element(
-        self, old: GraphElements, new: GraphElements
+        self, id: int, new: GraphElements
     ) -> 'Graph':
-        """Create a duplicate graph pattern with a pattern replaced"""
-        assert old.id in self.elements, "Replacing unknown element pattern"
+        """Create a duplicate graph pattern with an element replaced"""
+        old = self.elements.get(id)
+        assert old is not None, "Replacing unknown element pattern"
         assert type(old) is type(new), "Cannot change element type"
-        assert old.id == new.id, \
-            f"New element has different ID ({new.id} != {old.id})"
         elements = self.elements.copy()
-        elements[new.id] = new
+        elements[id] = new
         gp = Graph(elements, self.marked, self.left, self.right)
-        # print(f"{self} . with_replaced_atom({old}, {new}) -> {gp}")
         return gp
 
+    def overlay(self, other, *graph_ids: tuple['Graph', int]):
+        """
+        Overlay a graph on top of this one.
+
+        Args:
+            other:      The graph to overlay on top of this one.
+            graph_ids:  A tuple of 2-tuples, each containing one of the
+                        participating graphs, and the ID of one of its
+                        elements to have mapped to its new ID
+
+        Returns:
+            The overlaid "elements" dictionary, and the overlaid "marked"
+            dictionary, followed by the mapped IDs corresponding to each tuple
+            in graph_ids, in order.
+        """
+        assert isinstance(other, Graph)
+        assert isinstance(graph_ids, tuple)
+        assert all(
+            isinstance(graph_id, tuple) and
+            len(graph_id) == 2 and
+            graph_id[0] in (self, other) and
+            graph_id[1] in graph_id[0].elements
+            for graph_id in graph_ids
+        )
+
+        next_dynamic_id = 1
+        elements: dict[int, GraphElements] = {}
+        marked: dict[int, bool] = {}
+        graph_id_map: dict['Graph', dict[int, int]] = {}
+        graph_id_map[self] = {0: 0}
+        graph_id_map[other] = {0: 0}
+
+        def overlay(graph: 'Graph'):
+            nonlocal next_dynamic_id
+            id_map = graph_id_map[graph]
+
+            # Build ID map
+            for id, element in graph.elements.items():
+                if graph.is_static_id(id):
+                    new_id = id
+                else:
+                    new_id = next_dynamic_id
+                    next_dynamic_id += 2
+                id_map[id] = new_id
+
+            # Overlay elements
+            for id, element in graph.elements.items():
+                new_id = id_map[id]
+                if isinstance(element, Edge):
+                    element = element.with_updated_endpoints(
+                        id_map[element.source], id_map[element.target]
+                    )
+                elements[new_id] = elements.get(new_id, element) | element
+                if (marked_flag := graph.marked.get(id)) is not None:
+                    marked[new_id] = marked_flag
+
+        overlay(self)
+        overlay(other)
+
+        return elements, marked, *(
+            graph_id_map[graph][id]
+            for graph, id in graph_ids
+        )
+
     def __or__(self, other) -> 'Graph':
-        """Merge two graph patterns"""
+        """Merge another graph pattern to the right of this one"""
         if not isinstance(other, Graph):
             return NotImplemented
-        elements = self.elements.copy()
-        for id, element in other.elements.items():
-            elements[id] = elements.get(id, element) | element
-        marked = dict(
-            filter(
-                lambda id_mark: id_mark[1] is not None,
-                map(
-                    lambda id:
-                        (id, other.marked.get(id, self.marked.get(id))),
-                    set(self.marked) | set(other.marked)
-                )
-            )
-        )
-        return Graph(elements, marked, self.left, other.right)
+        return Graph(*self.overlay(
+            other, (self, self.left), (other, other.right)
+        ))
 
     def __pos__(self):
         """Mark all elements in the graph pattern"""
@@ -567,6 +483,34 @@ class Graph:
             self.right
         )
 
+    def __invert__(self):
+        """Swap static IDs and dynamic IDs of all elements"""
+        id_map = {0: 0}
+        next_dynamic_id = 1
+
+        # Build ID map
+        for id, element in self.elements.items():
+            if self.is_static_id(id):
+                id_map[id] = next_dynamic_id
+                next_dynamic_id += 2
+            else:
+                id_map[id] = Graph.__NEXT_STATIC_ID
+                Graph.__NEXT_STATIC_ID += 2
+
+        return Graph(
+            {
+                id_map[id]:
+                element.with_updated_endpoints(
+                    id_map[element.source],
+                    id_map[element.target]
+                ) if isinstance(element, Edge) else element
+                for id, element in self.elements.items()
+            },
+            {id_map[id]: mark for id, mark in self.marked.items()},
+            id_map[self.left],
+            id_map[self.right]
+        )
+
     def __getattr__(self, key: str) -> 'Graph':
         """Update the implicit attribute of the right element"""
         return self[key]
@@ -576,7 +520,8 @@ class Graph:
         element = self.elements[self.right]
         if isinstance(element, Element):
             return self.with_replaced_element(
-                *element.with_updated_attrs({"": key})
+                self.right,
+                element.with_updated_attrs({"": key})
             )
         raise ValueError
 
@@ -585,7 +530,8 @@ class Graph:
         element = self.elements[self.right]
         if isinstance(element, Element):
             return self.with_replaced_element(
-                *element.with_updated_attrs(attrs)
+                self.right,
+                element.with_updated_attrs(attrs)
             )
         raise ValueError
 
@@ -611,15 +557,21 @@ class Graph:
 
         # If the node is on the left
         if isinstance(left_element, Node):
-            node = left_element
+            node_graph = left
+            node_id = left.right
             if isinstance(right_element, Function):
+                function_graph = right
+                function_id = right.left
                 function = right_element
             else:
                 raise ValueError
         # Else, if the node is on the right
         elif isinstance(right_element, Node):
-            node = right_element
+            node_graph = right
+            node_id = right.left
             if isinstance(left_element, Function):
+                function_graph = left
+                function_id = left.right
                 function = left_element
             else:
                 raise ValueError
@@ -630,13 +582,17 @@ class Graph:
         if function.target:
             raise ValueError
 
-        combined = left | right
-        if combined.marked.get(left.right) or combined.marked.get(right.left):
-            combined.marked[function.id] = True
-        function = combined.elements[function.id]
-        return combined.with_replaced_element(
-            *function.with_updated_endpoints(target=node.id)
-        )
+        elements, marked, left_id, right_id, \
+            function_id, node_id = left.overlay(
+                right,
+                (left, left.left), (right, right.right),
+                (function_graph, function_id), (node_graph, node_id)
+            )
+        elements[function_id] = \
+            elements[function_id].with_updated_endpoints(target=node_id)
+        if marked.get(node_id):
+            marked[function_id] = True
+        return Graph(elements, marked, left_id, right_id)
 
     def __sub__(self, other) -> 'Graph':
         """Fill a function with an element (for S - O expression)"""
@@ -668,15 +624,21 @@ class Graph:
 
         # If the relation is on the left
         if isinstance(left_element, Relation):
-            relation = left_element
+            relation_graph = left
+            relation_id = left.right
             if isinstance(right_element, Function):
+                function_graph = right
+                function_id = right.left
                 function = right_element
             else:
                 raise ValueError
         # Else, if the relation is on the right
         elif isinstance(right_element, Relation):
-            relation = right_element
+            relation_graph = right
+            relation_id = right.left
             if isinstance(left_element, Function):
+                function_graph = left
+                function_id = left.right
                 function = left_element
             else:
                 raise ValueError
@@ -687,13 +649,17 @@ class Graph:
         if function.source:
             raise ValueError
 
-        combined = left | right
-        if combined.marked.get(left.right) or combined.marked.get(right.left):
-            combined.marked[function.id] = True
-        function = combined.elements[function.id]
-        return combined.with_replaced_element(
-            *function.with_updated_endpoints(source=relation.id)
-        )
+        elements, marked, left_id, right_id, \
+            function_id, relation_id = left.overlay(
+                right,
+                (left, left.left), (right, right.right),
+                (function_graph, function_id), (relation_graph, relation_id)
+            )
+        elements[function_id] = \
+            elements[function_id].with_updated_endpoints(source=relation_id)
+        if marked.get(relation_id):
+            marked[function_id] = True
+        return Graph(elements, marked, left_id, right_id)
 
     def __mul__(self, other) -> 'Graph':
         """Assign a function (for S * O expression)"""
@@ -783,8 +749,7 @@ class EntityGraph(ElementGraph):
         Args:
             attrs:  The attribute dictionary.
         """
-        ep = Entity(0, attrs)
-        super().__init__({ep.id: ep}, {}, ep.id, ep.id)
+        super().__init__({1: Entity(attrs)}, {}, 1, 1)
 
 
 class RelationGraph(ElementGraph):
@@ -797,8 +762,7 @@ class RelationGraph(ElementGraph):
         Args:
             attrs:  The relation's attribute dictionary.
         """
-        rp = Relation(0, attrs)
-        super().__init__({rp.id: rp}, {}, rp.id, rp.id)
+        super().__init__({1: Relation(attrs)}, {}, 1, 1)
 
 
 class FunctionGraph(ElementGraph):
@@ -811,5 +775,5 @@ class FunctionGraph(ElementGraph):
         Args:
             type:   The function's type name, or None for none.
         """
-        fp = Function(0, {} if type is None else dict(_type=type))
-        super().__init__({fp.id: fp}, {}, fp.id, fp.id)
+        fp = Function({} if type is None else dict(_type=type))
+        super().__init__({1: fp}, {}, 1, 1)

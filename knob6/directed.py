@@ -403,7 +403,7 @@ class Graph:
             """Format a label for a graphviz element"""
             return "\\n".join(
                 [("", "+")[element in self.marked] + element_ids[element]] +
-                [f"{quote(n)}={quote(trim(v))}"
+                [f"{quote(n)}={trim(v)!r}"
                  for n, v in element.attrs.items()]
             )
 

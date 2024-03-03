@@ -247,34 +247,46 @@ def test_mark_func(r1, f1, e1):
 
 
 def test_refs():
-    assert repr((x := E.x).y >> x) == \
+    assert repr((x := ~E.x).y >> x) == \
         'e1 < e1.x.y, r1:(source=e1, target=e1) > e1'
     x = None
 
-    assert repr((x := E.x) >> x.y) == \
+    assert repr((x := ~E.x) >> x.y) == \
         'e1 < e1.x.y, r1:(source=e1, target=e1) > e1'
     x = None
 
-    assert repr((x := E.x) >> +x) == \
+    assert repr((x := ~E.x) >> +x) == \
         'e1 < +e1.x, +r1:(+source=e1, +target=e1) > e1'
     x = None
 
-    assert repr((x := +E.x) >> -x) == \
+    assert repr((x := +~E.x) >> -x) == \
         'e1 < e1.x, +r1:(+source=e1, +target=e1) > e1'
     x = None
 
-    assert repr(+(x := E.x) >> x) == \
+    assert repr(+(x := ~E.x) >> x) == \
         'e1 < +e1.x, +r1:(+source=e1, +target=e1) > e1'
     x = None
 
-    assert repr((x := E.x >> E.y) >> x) == (
+    assert repr((x := ~E.x >> E.y) >> x) == (
         'e1 < '
-        'e1.x, e2.y, r1:(source=e1, target=e2), r2:(source=e2, target=e1) '
+        'e1.x, e2.y, e3.y, '
+        'r1:(source=e1, target=e2), '
+        'r2:(source=e2, target=e1), '
+        'r3:(source=e1, target=e3) '
+        '> e3'
+    )
+    x = None
+
+    assert repr((x := ~(E.x >> E.y)) >> x) == (
+        'e1 < '
+        'e1.x, e2.y, '
+        'r1:(source=e1, target=e2), '
+        'r2:(source=e2, target=e1) '
         '> e2'
     )
     x = None
 
-    assert repr((x := E.x(attr1=10)) >> E.y >> x(attr2=20)) == (
+    assert repr((x := ~E.x(attr1=10)) >> E.y >> x(attr2=20)) == (
         'e1 < '
         'e1.x(attr1=10, attr2=20), '
         'e2.y, '
@@ -284,7 +296,7 @@ def test_refs():
     )
     x = None
 
-    assert repr((x := E.x(attr1=10)) >> E.y >> x(attr1=20)) == (
+    assert repr((x := ~E.x(attr1=10)) >> E.y >> x(attr1=20)) == (
         'e1 < '
         'e1.x(attr1=20), '
         'e2.y, '
@@ -297,7 +309,7 @@ def test_refs():
 
 def test_complex():
     assert repr(
-        (a := E.ll_state.Advertising(
+        (a := ~E.ll_state.Advertising(
                 comment='Device is an "advertiser"')) >>
         R.ll_state_transition >>
         E.ll_state.Standby(comment='No transmit/receive') >>
@@ -316,6 +328,7 @@ def test_multidigit_ids():
     gp = E()
     for _ in range(9):
         gp >>= E()
+    gp = ~gp
     gp >>= gp
     assert repr(gp) == (
         'e1 < '
