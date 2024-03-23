@@ -104,10 +104,21 @@ class Graph(directed.Graph):
                 graph.node(id, label=label, shape="diamond", style="rounded")
             # Add explicit function edges
             elif element in explicit_functions:
-                graph.edge(
-                    element_ids[element.source], element_ids[element.target],
-                    label=label
-                )
+                if element.attrs.get("_type") == "source":
+                    graph.edge(
+                        element_ids[element.target], element_ids[element.source],
+                        penwidth="2", arrowsize="2", arrowhead="onormal"
+                    )
+                elif element.attrs.get("_type") == "target":
+                    graph.edge(
+                        element_ids[element.source], element_ids[element.target],
+                        penwidth="2", arrowsize="2", arrowhead="onormal"
+                    )
+                else:
+                    graph.edge(
+                        element_ids[element.source], element_ids[element.target],
+                        label=label
+                    )
             # Add implicit relations
             elif endpoints := implicit_relations_endpoints.get(element):
                 graph.edge(
