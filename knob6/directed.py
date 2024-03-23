@@ -634,7 +634,7 @@ class Graph:
                 yield matches
                 matches_set.add(frozen_matches)
 
-    def match(self, other: "Graph") -> Generator["Graph", None, None]:
+    def separate_match(self, other: "Graph") -> Generator["Graph", None, None]:
         """
         Find all matches of this graph as a pattern against another graph.
 
@@ -649,6 +649,43 @@ class Graph:
             g = type(self)(set(matches.values()))
             # print_stack_indented(f"<- {g}")
             yield g
+
+    def match(self, other: "Graph") -> "Graph":
+        """
+        Produce a graph containing all matches of this graph as a pattern
+        against another graph.
+
+        Args:
+            other:  The graph to match this graph against.
+
+        Returns:
+            The graph with all the matches of this graph against the other.
+
+        Raises:
+            Graph.Mismatch: the graph didn't match the other graph.
+        """
+        matched = False
+        elements: set[Elements] = set()
+        for matches in self.detailed_match(other):
+            matched = True
+            elements.update(matches.values())
+        if matched:
+            return type(self)(elements)
+        raise Graph.Mismatch()
+
+    def __matmul__(self, other):
+        """Produce a subgraph matching another graph used as a pattern"""
+        other = self.coerce(other)
+        if isinstance(other, Graph):
+            return other.match(self)
+        return NotImplemented
+
+    def __rmatmul__(self, other):
+        """Produce a subgraph of another graph matching this pattern"""
+        other = self.coerce(other)
+        if isinstance(other, Graph):
+            return self.match(other)
+        return NotImplemented
 
     def matches(self, other: "Graph") -> bool:
         """

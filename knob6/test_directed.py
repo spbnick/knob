@@ -29,36 +29,63 @@ def G(*elements: Elements, marked: Optional[set[Elements]] = None) -> Graph:
 
 
 def test_match_empty_both():
-    assert set(G().match(G())) == {G()}
+    assert set(G().separate_match(G())) == {G()}
+    assert G() @ G() == G()
 
 
 def test_match_empty_to_non_empty():
-    assert set(G().match(G(E(N(x=1), N(x=2))))) == {G()}
+    assert set(G().separate_match(G(E(N(x=1), N(x=2))))) == {G()}
+    assert G(E(N(x=1), N(x=2))) @ G() == G()
 
 
 def test_match_non_empty_to_empty():
-    assert set(G(E(N(x=1), N(x=2))).match(G())) == set()
+    assert set(G(E(N(x=1), N(x=2))).separate_match(G())) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = G() @ G(E(N(x=1), N(x=2)))
 
 
 def test_match_one_node():
     g = G(N())
-    assert set(G(N()).match(g)) == {g}
-    assert set(G(N(y=2)).match(g)) == set()
+    assert set(G(N()).separate_match(g)) == {g}
+    assert g @ G(N()) == g
+    assert set(G(N(y=2)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(y=2))
     g = G(N(x=1))
-    assert set(G(N()).match(g)) == {g}
-    assert set(G(N(x=1)).match(g)) == {g}
-    assert set(G(N(x=2)).match(g)) == set()
-    assert set(G(N(y=2)).match(g)) == set()
+    assert set(G(N()).separate_match(g)) == {g}
+    assert g @ G(N()) == g
+    assert set(G(N(x=1)).separate_match(g)) == {g}
+    assert g @ G(N(x=1)) == g
+    assert set(G(N(x=2)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(x=2))
+    assert set(G(N(y=2)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(y=2))
     g = G(N(x=1, y=2))
-    assert set(G(N()).match(g)) == {g}
-    assert set(G(N(x=1)).match(g)) == {g}
-    assert set(G(N(x=2)).match(g)) == set()
-    assert set(G(N(y=2)).match(g)) == {g}
-    assert set(G(N(y=1)).match(g)) == set()
-    assert set(G(N(x=1, y=2)).match(g)) == {g}
-    assert set(G(N(x=2, y=2)).match(g)) == set()
-    assert set(G(N(x=1, y=1)).match(g)) == set()
-    assert set(G(N(x=2, y=1)).match(g)) == set()
+    assert set(G(N()).separate_match(g)) == {g}
+    assert g @ G(N()) == g
+    assert set(G(N(x=1)).separate_match(g)) == {g}
+    assert g @ G(N(x=1)) == g
+    assert set(G(N(x=2)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(x=2))
+    assert set(G(N(y=2)).separate_match(g)) == {g}
+    assert g @ G(N(y=2)) == g
+    assert set(G(N(y=1)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(y=1))
+    assert set(G(N(x=1, y=2)).separate_match(g)) == {g}
+    assert g @ G(N(x=1, y=2)) == g
+    assert set(G(N(x=2, y=2)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(x=2, y=2))
+    assert set(G(N(x=1, y=1)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(x=1, y=1))
+    assert set(G(N(x=2, y=1)).separate_match(g)) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = g @ G(N(x=2, y=1))
 
 
 def test_match_two_nodes():
@@ -66,40 +93,50 @@ def test_match_two_nodes():
     n1_b = N(n=1)
     n1 = n1_a
     n2 = N(n=2)
-    assert set(G(N(n=1)).match(G(n1_a, n2))) == {G(n1_a)}
-    assert set(G(N(n=1)).match(G(n1_b, n2))) == {G(n1_b)}
-    assert set(G(N(n=1)).match(G(n1_a, n1_b))) == {G(n1_a), G(n1_b)}
-    assert set(G(N()).match(G(n1_a, n1_b))) == {G(n1_a), G(n1_b)}
-    assert set(G(N()).match(G(n1, n2))) == {G(n1), G(n2)}
-    assert set(G(N(n=1), N(n=2)).match(G(n1, n2))) == {G(n1, n2)}
-    assert set(G(N(n=1), N(n=3)).match(G(n1, n2))) == set()
-    assert set(G(N(n=3)).match(G(n1, n2))) == set()
+    assert set(G(N(n=1)).separate_match(G(n1_a, n2))) == {G(n1_a)}
+    assert G(n1_a, n2) @ G(N(n=1)) == G(n1_a)
+    assert set(G(N(n=1)).separate_match(G(n1_b, n2))) == {G(n1_b)}
+    assert G(n1_b, n2) @ G(N(n=1)) == G(n1_b)
+    assert set(G(N(n=1)).separate_match(G(n1_a, n1_b))) == {G(n1_a), G(n1_b)}
+    assert G(n1_a, n1_b) @ G(N(n=1)) == G(n1_a, n1_b)
+    assert set(G(N()).separate_match(G(n1_a, n1_b))) == {G(n1_a), G(n1_b)}
+    assert G(n1_a, n1_b) @ G(N()) == G(n1_a, n1_b)
+    assert set(G(N()).separate_match(G(n1, n2))) == {G(n1), G(n2)}
+    assert G(n1, n2) @ G(N()) == G(n1, n2)
+    assert set(G(N(n=1), N(n=2)).separate_match(G(n1, n2))) == {G(n1, n2)}
+    assert G(n1, n2) @ G(N(n=1), N(n=2)) == G(n1, n2)
+    assert set(G(N(n=1), N(n=3)).separate_match(G(n1, n2))) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = G(n1, n2) @ G(N(n=1), N(n=3))
+    assert set(G(N(n=3)).separate_match(G(n1, n2))) == set()
+    with pytest.raises(Graph.Mismatch):
+        _ = G(n1, n2) @ G(N(n=3))
 
 
 def test_match_one_edge():
     e = E(N(x=1), N(x=2))
-    assert set(G(e).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=1), N(x=2))).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=2), N(x=1))).match(G(e))) == set()
-    assert set(G(E(N(), N(x=2))).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=2), N())).match(G(e))) == set()
-    assert set(G(E(N(x=1), N())).match(G(e))) == {G(e)}
-    assert set(G(E(N(), N(x=1))).match(G(e))) == set()
-    assert set(G(E(N(), N())).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=1), N(x=3))).match(G(e))) == set()
-    assert set(G(E(N(x=3), N(x=2))).match(G(e))) == set()
-    assert set(G(E(N(x=1), N(x=2), y=1)).match(G(e))) == set()
+    assert set(G(e).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=1), N(x=2))).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N(x=1))).separate_match(G(e))) == set()
+    assert set(G(E(N(), N(x=2))).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N())).separate_match(G(e))) == set()
+    assert set(G(E(N(x=1), N())).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(), N(x=1))).separate_match(G(e))) == set()
+    assert set(G(E(N(), N())).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=1), N(x=3))).separate_match(G(e))) == set()
+    assert set(G(E(N(x=3), N(x=2))).separate_match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2), y=1)).separate_match(G(e))) == set()
 
     e = E(N(x=1), N(x=2), y=1)
-    assert set(G(E(N(), N(), y=1)).match(G(e))) == {G(e)}
-    assert set(G(E(N(), N())).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=1), N(x=2), y=1)).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=2), N(x=1), y=1)).match(G(e))) == set()
-    assert set(G(E(N(x=1), N(x=2))).match(G(e))) == {G(e)}
-    assert set(G(E(N(x=2), N(x=1))).match(G(e))) == set()
-    assert set(G(E(N(x=1), N(x=2), y=2)).match(G(e))) == set()
-    assert set(G(E(N(), N(), y=2)).match(G(e))) == set()
-    assert set(G(E(N(x=1), N(x=2), z=3)).match(G(e))) == set()
+    assert set(G(E(N(), N(), y=1)).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(), N())).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=1), N(x=2), y=1)).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N(x=1), y=1)).separate_match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2))).separate_match(G(e))) == {G(e)}
+    assert set(G(E(N(x=2), N(x=1))).separate_match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2), y=2)).separate_match(G(e))) == set()
+    assert set(G(E(N(), N(), y=2)).separate_match(G(e))) == set()
+    assert set(G(E(N(x=1), N(x=2), z=3)).separate_match(G(e))) == set()
 
 
 def test_match_self_loop():
@@ -114,14 +151,15 @@ def test_match_self_loop():
     ep11 = E(np1, np1)
     ep22 = E(np2, np2)
     ep12 = E(np1, np2)
-    assert set(G(ep11).match(G(e11))) == {G(e11)}
-    assert set(G(ep11).match(G(e11, e22))) == {G(e11), G(e22)}
-    assert set(G(ep11, ep22).match(G(e11, e22))) == {G(e11, e22)}
-    assert set(G(ep11, ep22).match(G(e11, e22, e12))) == {G(e11, e22)}
-    assert set(G(ep12).match(G(e11, e22, e12))) == {G(e12)}
-    assert set(G(ep12).match(G(e11, e22))) == set()
-    assert set(G(ep11, ep22).match(G(e11))) == set()
-    assert set(G(ep11, ep22).match(G(e22))) == set()
+    assert set(G(ep11).separate_match(G(e11))) == {G(e11)}
+    assert set(G(ep11).separate_match(G(e11, e22))) == {G(e11), G(e22)}
+    assert G(e11, e22) @ G(ep11) == G(e11, e22)
+    assert set(G(ep11, ep22).separate_match(G(e11, e22))) == {G(e11, e22)}
+    assert set(G(ep11, ep22).separate_match(G(e11, e22, e12))) == {G(e11, e22)}
+    assert set(G(ep12).separate_match(G(e11, e22, e12))) == {G(e12)}
+    assert set(G(ep12).separate_match(G(e11, e22))) == set()
+    assert set(G(ep11, ep22).separate_match(G(e11))) == set()
+    assert set(G(ep11, ep22).separate_match(G(e22))) == set()
 
 
 def test_match_loops():
@@ -130,47 +168,53 @@ def test_match_loops():
     np = [N() for np in range(0, 4)]
     ep = [[E(np1, np2) for np2 in np] for np1 in np]
 
-    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).separate_match(
         G(e[0][1], e[1][2], e[2][0])
     )) == {G(e[0][1], e[1][2], e[2][0])}
-    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).separate_match(
         G(e[0][1], e[1][2], e[0][2])
     )) == set()
-    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).separate_match(
         G(e[0][1], e[1][2], e[2][0], e[2][3])
     )) == {G(e[0][1], e[1][2], e[2][0])}
-    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).separate_match(
         G(e[0][1], e[1][2], e[2][0], e[2][3], e[3][1])
     )) == {
         G(e[0][1], e[1][2], e[2][0]),
         G(e[1][2], e[2][3], e[3][1])
     }
-    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).separate_match(
         G(e[0][1], e[1][2], e[2][0], e[2][3], e[1][3])
     )) == {G(e[0][1], e[1][2], e[2][0])}
-    assert set(G(ep[0][1], ep[1][2], ep[2][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][0]).separate_match(
         G(e[0][1], e[1][2], e[0][2], e[2][3], e[1][3])
     )) == set()
-    assert set(G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).match(
+    assert set(G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).separate_match(
         G(e[0][1], e[1][2], e[2][3], e[3][0])
     )) == {G(e[0][1], e[1][2], e[2][3], e[3][0])}
-    assert set(G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).match(
+    assert G(e[0][1], e[1][2], e[2][3], e[3][0]) @ \
+        G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]) == \
+        G(e[0][1], e[1][2], e[2][3], e[3][0])
+    assert set(G(ep[0][1], ep[1][2], ep[2][3], ep[3][0]).separate_match(
         G(e[1][0], e[2][1], e[3][2], e[0][3])
     )) == {G(e[1][0], e[2][1], e[3][2], e[0][3])}
 
-    assert set(G(ep[0][1], ep[1][0]).match(
+    assert set(G(ep[0][1], ep[1][0]).separate_match(
         G(e[1][0], e[0][1], e[2][3], e[3][2])
     )) == {G(e[1][0], e[0][1]), G(e[2][3], e[3][2])}
+    assert G(e[1][0], e[0][1], e[2][3], e[3][2]) @ \
+        G(ep[0][1], ep[1][0]) == \
+        G(e[1][0], e[0][1], e[2][3], e[3][2])
 
-    assert set(G(ep[0][0]).match(
+    assert set(G(ep[0][0]).separate_match(
         G(e[1][0], e[0][1])
     )) == set()
 
-    assert set(G(ep[0][1], ep[1][0]).match(
+    assert set(G(ep[0][1], ep[1][0]).separate_match(
         G(e[0][1], e[1][2], e[2][0])
     )) == set()
 
-    assert set(G(ep[0][0]).match(
+    assert set(G(ep[0][0]).separate_match(
         G(e[0][1], e[1][2], e[2][0],
           e[0][0], e[1][1], e[2][2])
     )) == {G(e[0][0]), G(e[1][1]), G(e[2][2])}
@@ -184,7 +228,7 @@ def test_match_components():
 
     assert set(G(
         ep[0][1], ep[1][2], ep[2][0]
-    ).match(G(
+    ).separate_match(G(
         e[0][1], e[1][2], e[2][0],
         e[3][4], e[4][5], e[5][3]
     ))) == {
@@ -195,7 +239,7 @@ def test_match_components():
     assert set(G(
         ep[0][1], ep[1][2], ep[2][0],
         ep[3][4], ep[4][5], ep[5][3]
-    ).match(G(
+    ).separate_match(G(
         e[0][1], e[1][2], e[2][0],
         e[3][4], e[4][5], e[5][3]
     ))) == {G(
@@ -206,7 +250,7 @@ def test_match_components():
     assert set(G(
         ep[0][1], ep[1][2], ep[2][0],
         ep[3][4], ep[4][5], ep[5][3]
-    ).match(G(
+    ).separate_match(G(
         e[0][1], e[1][2], e[2][0]
     ))) == set()
 
