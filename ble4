@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+
+import sys
+import knob6
+
+g = knob6.knowledge.Graph()
+e = knob6.knowledge.pattern.EntityGraph()
+r = knob6.knowledge.pattern.RelationGraph()
+f = knob6.knowledge.pattern.FunctionGraph()
+n = e[""]
+s = e.ll_state
+t = r.ll_state_transition
+role = e.role
+
+g **= +n.Device
+
+g **= +s.Advertising(
+    implementation_required=True,
+    comment="Device in this state is an \"advertiser\", and is "
+            "transmitting advertising physical channel packets, "
+            "and listening and responding to responses."
+) >> +role.Advertiser << n.Device
+
+g **= +s.Scanning(
+    implementation_required=True,
+    comment="Device in this state is a \"scanner\", and is listening for "
+            "advertising physical channel packets from devices that are "
+            "advertising. This state can be entered from the Standby state."
+) >> +role.Scanner << n.Device
+
+g **= +s.Initiating(
+    comment="The Link Layer in the Initiating state will be listening for "
+            "advertising physical channel packets from a specific device(s) "
+            "and responding to these packets to initiate a connection with "
+            "another device. A device in the Initiating state is known as an "
+            "initiator. The Initiating state can be entered from the Standby "
+            "state."
+) >> +role.Initiator << n.Device
+
+g **= +s.Standby(
+    comment="The Link Layer in the Standby state does not transmit or "
+            "receive any packets. The Standby state can be entered from "
+            "any other state."
+)
+
+g **= +s.Connection(
+    comment="The Connection state can be entered either from the Initiating "
+            "state or the Advertising state. A device in the Connection "
+            "state is known as being in a connection."
+) >> +role["In a Connection"] << n.Device
+
+g **= +s.Synchronization(
+    comment="The Link Layer in the Synchronization State will be listening "
+            "for periodic physical channel packets forming a specific "
+            "periodic advertising train, coming from a specified device that "
+            "is transmitting periodic advertising. The Synchronization State "
+            "can be entered from the Standby State. While in this State, the "
+            "Host may direct the Link Layer to listen for isochronous data "
+            "packets coming from a specified device that is transmitting a "
+            "Broadcast Isochronous Group (BIG). A device that is in the "
+            "Synchronization State and is receiving isochronous data packets "
+            "is referred to as a Synchronized Receiver."
+) >> +role["Synchronized Receiver"] << n.Device
+
+g **= +s["Isochronous Broadcasting"](
+    comment="The Link Layer in the Isochronous Broadcasting State will "
+            "transmit isochronous data packets on an isochronous physical "
+            "channel. The Isochronous Broadcasting State can be entered from "
+            "the Standby State. A device that is in the Isochronous "
+            "Broadcasting State is referred to as an Isochronous Broadcaster."
+) >> +role["Isochronous Broadcaster"] << n.Device
+
+g **= +role.Peripheral(
+    comment="The Link Layer in the Peripheral Role will communicate with a "
+            "single device in the Central Role."
+) << n.Device
+
+g **= +role.Central(
+    comment="The Link Layer in the Central Role will communicate with a "
+            "device in the Peripheral Role and define the timings of "
+            "transmissions."
+) << n.Device
+
+g **= s.Advertising >> +t >> s.Standby
+g **= s.Advertising << +t << s.Standby
+g **= s.Advertising >> +t >> role.Peripheral
+
+g **= s["Isochronous Broadcasting"] >> +t >> s.Standby
+g **= s["Isochronous Broadcasting"] << +t << s.Standby
+
+g **= s.Scanning >> +t >> s.Standby
+g **= s.Scanning << +t << s.Standby
+
+g **= s.Synchronization >> +t >> s.Standby
+g **= s.Synchronization << +t << s.Standby
+
+g **= s.Initiating >> +t >> s.Standby
+g **= s.Initiating << +t << s.Standby
+g **= s.Initiating >> +t >> role.Central
+
+g **= s.Connection >> + r >> role.Central >> +t >> s.Standby
+g **= s.Connection >> + r >> role.Peripheral >> +t >> s.Standby
+
+g **= n.Device >> +r.identified_by >> +n["Device Address Type"]
+g **= n.Device >> +r.identified_by >> +n["Device Address"]
+    
+g **= n["Device Address"] << (x := ~+r.type_of) << \
+    +n["Public Device Address"](
+        length_bits=48,
+        created_according_to="[Vol 2] Part B, Section 1.2",
+    ) | x * +f.identified_by - n["Device Address Type"]
+
+g **= n["Device Address"] << (x := ~+r.type_of) << \
+    +n["Random Device Address"](
+        length_bits=48
+    ) | x * +f.identified_by - n["Device Address Type"]
+
+with open("ble4.gv", "w") as file:
+    #file.write((g @ (e >> t >> e)).graphviz())
+    file.write(g.graphviz())
+sys.exit()
+
+
+n.Device >> n["Identity Address"] << r.type_of << [
+    n["Public Device Address"],
+    n["Random Static Device Address"],
+]
+
+n["Random Device Address"] << r.type_of << [
+    e.bitfield_value["Static device address"] << \
+        r.identified_by << \
+        n["Random Static Device Address"](
+            comment="Shall meet the following requirements:\n"
+                    "• At least one bit of the random part of the address "
+                    "shall be 0\n"
+                    "• At least one bit of the random part of the address "
+                    "shall be 1\n"
+                    "\n"
+                    "A device may choose to initialize its static address to "
+                    "a new value after each power cycle. A device shall not "
+                    "change its static address value once initialized "
+                    "until the device is power cycled.\n"
+                    "\n"
+                    "Note: If the static address of a device is changed, "
+                    "then the address stored in peer devices will not be "
+                    "valid and the ability to reconnect using the old "
+                    "address will be lost."
+        ),
+    [
+        e.bitfield_value["Non-resolvable private address"] << \
+            r.identified_by << \
+            n["Random Non-Resolvable Private Device Address"](
+                comment="Requirements:\n"
+                        "• At least one bit of the random part of the "
+                        "address shall be 1\n"
+                        "• At least one bit of the random part of the "
+                        "address shall be 0\n"
+                        "• The address shall not be equal to the public "
+                        "address"
+            ) >> r.type_of,
+        e.bitfield_value["Resolvable private address"] << \
+            r.identified_by << \
+            n["Random Resolvable Private Device Address"](
+                comment="To generate a resolvable private address, the "
+                        "device must have either the Local Identity "
+                        "Resolving Key (IRK) or the Peer Identity Resolving "
+                        "Key (IRK). The resolvable private address shall be "
+                        "generated with the IRK and a randomly generated "
+                        "24-bit number."
+            ) >> r.type_of,
+    ] >> n["Random Private Device Address"]
+]
+
+n["Random Device Address"] >> r.bitfields >> \
+e.bitfield["Random Device Address Random Part"](len=46) >> r.followed_by >> \
+(
+    [
+        e.bitfield_value["Non-resolvable private address"](value=0),
+        e.bitfield_value["Resolvable private address"](value=1),
+        e.bitfield_value["Reserved for future use"](value=2),
+        e.bitfield_value["Static device address"](value=3),
+    ] << r.value << e.bitfield["Random Device Address Sub-Type"](len=2)
+)
+
+e.bitfield["Random Device Address Random Part"] >> \
+    r.bitfields(
+        selected_by=e.bitfield_value["Resolvable private address"]
+    ) >> \
+    e.bitfield["Random Device Resolvable Private Address Hash"](len=24) >> \
+    r.followed_by >> \
+    e.bitfield["Random Device Resolvable Private "
+               "Address, Random Part of Prand"](
+        len=22,
+        comment="Requirements: at least one bit shall be 0, "
+                "at least one bit shall be 1"
+    )
