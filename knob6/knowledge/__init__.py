@@ -127,13 +127,13 @@ class Graph(directed.Graph):
                     graph.edge(
                         element_ids[element.target],
                         element_ids[element.source],
-                        penwidth="2", arrowsize="2", arrowhead="onormal"
+                        penwidth="2", arrowsize="2", arrowhead="none"
                     )
                 elif element.attrs.get("_type") == "target":
                     graph.edge(
                         element_ids[element.source],
                         element_ids[element.target],
-                        penwidth="2", arrowsize="2", arrowhead="onormal"
+                        penwidth="2", arrowsize="2"
                     )
                 else:
                     graph.edge(
