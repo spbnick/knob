@@ -646,7 +646,7 @@ class Graph:
         """
         # print_stack_indented(f"match{(self, other)}")
         for matches in self.detailed_match(other):
-            g = type(self)(set(matches.values()))
+            g = type(other)(set(matches.values()))
             # print_stack_indented(f"<- {g}")
             yield g
 
@@ -670,7 +670,7 @@ class Graph:
             matched = True
             elements.update(matches.values())
         if matched:
-            return type(self)(elements)
+            return type(other)(elements)
         raise Graph.Mismatch()
 
     def __matmul__(self, other):
