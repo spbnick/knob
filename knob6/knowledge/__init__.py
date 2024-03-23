@@ -22,13 +22,13 @@ class Graph(directed.Graph):
             return ""
         label = '<<TABLE BORDER="0">'
         attrs = element.attrs.copy()
-        if v:= attrs.pop("_type", ""):
+        if v := attrs.pop("_type", ""):
             label += (
                 f'<TR><TD COLSPAN="2">'
                 f'<I>{html.escape(str(v))}</I>'
                 f'</TD></TR>'
             )
-        if v:= attrs.pop("_name", ""):
+        if v := attrs.pop("_name", ""):
             label += (
                 f'<TR><TD COLSPAN="2">'
                 f'<B>{html.escape(str(v))}</B>'
@@ -53,7 +53,8 @@ class Graph(directed.Graph):
         Returns:
             The rendered Graphviz source code.
         """
-        # We'll try to manage, pylint: disable=too-many-locals
+        # We'll try to manage,
+        # pylint: disable=too-many-locals,too-many-branches
 
         # A map of relation nodes and sets of their outgoing edges
         relations_edges: dict[directed.Node, set[directed.Edge]] = {}
@@ -124,17 +125,20 @@ class Graph(directed.Graph):
             elif element in explicit_functions:
                 if element.attrs.get("_type") == "source":
                     graph.edge(
-                        element_ids[element.target], element_ids[element.source],
+                        element_ids[element.target],
+                        element_ids[element.source],
                         penwidth="2", arrowsize="2", arrowhead="onormal"
                     )
                 elif element.attrs.get("_type") == "target":
                     graph.edge(
-                        element_ids[element.source], element_ids[element.target],
+                        element_ids[element.source],
+                        element_ids[element.target],
                         penwidth="2", arrowsize="2", arrowhead="onormal"
                     )
                 else:
                     graph.edge(
-                        element_ids[element.source], element_ids[element.target],
+                        element_ids[element.source],
+                        element_ids[element.target],
                         label=label
                     )
             # Add implicit relations
