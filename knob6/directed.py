@@ -186,19 +186,17 @@ class Graph:
             return NotImplemented
         return self.elements == other.elements and self.marked == other.marked
 
-    def get_nodes(self) -> set[Node]:
+    def get_nodes(self) -> Generator[Node, None, None]:
         """Extract the set of nodes from the set of graph elements"""
-        return set(filter(
-            lambda e: isinstance(e, Node),  # type: ignore
-            self.elements
-        ))
+        for element in self.elements:
+            if isinstance(element, Node):
+                yield element
 
-    def get_edges(self) -> set[Edge]:
+    def get_edges(self) -> Generator[Edge, None, None]:
         """Extract the set of edges from the set of graph elements"""
-        return set(filter(
-            lambda e: isinstance(e, Edge),  # type: ignore
-            self.elements
-        ))
+        for element in self.elements:
+            if isinstance(element, Edge):
+                yield element
 
     def get_marked_nodes(self) -> set[Node]:
         """Extract the set of nodes from the set of marked graph elements"""
@@ -239,14 +237,14 @@ class Graph:
         return "{" + ", ".join(map("".join, list(elements.values()))) + "}"
 
     def __copy__(self):
-        return Graph(elements=self.elements, marked=self.marked)
+        return type(self)(elements=self.elements, marked=self.marked)
 
     def __or__(self, other):
         other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
-        return Graph(elements=self.elements | other.elements,
-                     marked=self.marked | other.marked)
+        return type(self)(elements=self.elements | other.elements,
+                          marked=self.marked | other.marked)
 
     def __ior__(self, other):
         other = self.coerce(other)
@@ -260,8 +258,8 @@ class Graph:
         other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
-        return Graph(elements=self.elements - other.elements,
-                     marked=self.marked - other.marked)
+        return type(self)(elements=self.elements - other.elements,
+                          marked=self.marked - other.marked)
 
     def __isub__(self, other):
         other = self.coerce(other)
@@ -275,8 +273,8 @@ class Graph:
         other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
-        return Graph(elements=self.elements & other.elements,
-                     marked=self.marked & other.marked)
+        return type(self)(elements=self.elements & other.elements,
+                          marked=self.marked & other.marked)
 
     def __iand__(self, other):
         other = self.coerce(other)
@@ -290,8 +288,8 @@ class Graph:
         other = self.coerce(other)
         if not isinstance(other, Graph):
             return NotImplemented
-        return Graph(elements=self.elements ^ other.elements,
-                     marked=self.marked ^ other.marked)
+        return type(self)(elements=self.elements ^ other.elements,
+                          marked=self.marked ^ other.marked)
 
     def __ixor__(self, other):
         other = self.coerce(other)
@@ -369,6 +367,31 @@ class Graph:
         self.elements -= elements
         return self
 
+    @classmethod
+    def graphviz_trim(cls, v: AttrTypes):
+        """
+        Trim a value to a certain maximum length, if necessary, for graphviz.
+        """
+        return v[:61] + "..." if isinstance(v, str) and len(v) > 64 else v
+
+    @classmethod
+    def graphviz_quote(cls, v: AttrTypes):
+        """Quote a value, if necessary, for graphviz"""
+        return (
+            str(v)
+            if isinstance(v, int) or v.isidentifier()
+            else repr(v)
+        )
+
+    @classmethod
+    def graphviz_format_label(cls, id: str, element: Elements, marked: bool):
+        """Format a label for a graphviz element"""
+        return "\\n".join(
+            [("", "+")[marked] + id] +
+            [f"{cls.graphviz_quote(n)}={cls.graphviz_trim(v)!r}"
+             for n, v in element.attrs.items()]
+        )
+
     def graphviz(self) -> str:
         """
         Render the graph into a Graphviz representation.
@@ -387,34 +410,18 @@ class Graph:
             enumerate(sorted(self.get_edges(), key=lambda n: n.id))
         }
 
-        def trim(v: AttrTypes):
-            """Trim a value to a certain maximum length, if necessary"""
-            return v[:61] + "..." if isinstance(v, str) and len(v) > 64 else v
-
-        def quote(v: AttrTypes):
-            """Quote a value, if necessary"""
-            return (
-                str(v)
-                if isinstance(v, int) or v.isidentifier()
-                else repr(v)
-            )
-
-        def format_label(element: Elements):
-            """Format a label for a graphviz element"""
-            return "\\n".join(
-                [("", "+")[element in self.marked] + element_ids[element]] +
-                [f"{quote(n)}={trim(v)!r}"
-                 for n, v in element.attrs.items()]
-            )
-
         graph = graphviz.Digraph(node_attr=dict(shape="box"))
         for element, id in element_ids.items():
+            label = self.graphviz_format_label(
+                str(id), element, element in self.marked
+            )
             if isinstance(element, Node):
-                graph.node(id, label=format_label(element))
+                graph.node(id, label=label)
             elif isinstance(element, Edge):
-                graph.edge(element_ids[element.source],
-                           element_ids[element.target],
-                           label=format_label(element))
+                graph.edge(
+                    element_ids[element.source], element_ids[element.target],
+                    label=label
+                )
         return graph.source
 
     def get_incident_edges(self, nodes: set[Node] | Node) -> set[Edge]:
@@ -451,10 +458,10 @@ class Graph:
             and the matched element of the other graph, whenever this graph
             matches completely.
         """
-        self_nodes = self.get_nodes()
-        self_edges = self.get_edges()
-        other_nodes = other.get_nodes()
-        other_edges = other.get_edges()
+        self_nodes = set(self.get_nodes())
+        self_edges = set(self.get_edges())
+        other_nodes = set(other.get_nodes())
+        other_edges = set(other.get_edges())
 
         def match_components(
             matches: Dict[Elements, Elements],
@@ -639,7 +646,7 @@ class Graph:
         """
         # print_stack_indented(f"match{(self, other)}")
         for matches in self.detailed_match(other):
-            g = Graph(set(matches.values()))
+            g = type(self)(set(matches.values()))
             # print_stack_indented(f"<- {g}")
             yield g
 
@@ -682,7 +689,7 @@ class Graph:
         edges_external = marked_edges - edges_internal
 
         edges_to_add = None
-        for matches in Graph(
+        for matches in type(self)(
             other.elements - marked_nodes - marked_edges -
             other.get_incident_edges(marked_nodes)
         ).detailed_match(self):

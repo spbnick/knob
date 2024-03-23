@@ -4,7 +4,7 @@ KNOB - The knowledge graph pattern
 
 from typing import Optional, Self, cast
 from knob6.misc import AttrTypes, attrs_repr
-from . import directed
+from knob6 import directed
 
 # Calm down, pylint: disable=too-few-public-methods
 # NO, pylint: disable=use-dict-literal,no-else-return

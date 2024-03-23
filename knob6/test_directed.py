@@ -11,23 +11,21 @@ from knob6.directed import Node as N, Edge as E, Graph, Elements
 # We need them, pylint: disable=fixme
 
 
-class G(Graph):
-    """A directed graph allowing indirect element specification"""
-    def __init__(self, *elements: Elements,
-                 marked: Optional[set[Elements]] = None):
-        empty_elements: set[Elements] = set()
-        super().__init__(
-            elements=functools.reduce(
-                lambda a, b: a | b,
-                (
-                    {e} if isinstance(e, N)
-                    else {e, e.source, e.target}  # type: ignore
-                    for e in elements
-                ),
-                empty_elements
+def G(*elements: Elements, marked: Optional[set[Elements]] = None) -> Graph:
+    """Create a directed graph allowing indirect element specification"""
+    empty_elements: set[Elements] = set()
+    return Graph(
+        elements=functools.reduce(
+            lambda a, b: a | b,
+            (
+                {e} if isinstance(e, N)
+                else {e, e.source, e.target}  # type: ignore
+                for e in elements
             ),
-            marked=marked
-        )
+            empty_elements
+        ),
+        marked=marked
+    )
 
 
 def test_match_empty_both():
@@ -225,7 +223,7 @@ def test_graft_empty_pattern():
 
 def test_graft_mismatch():
     e = E(N(x=1), N(x=2))
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G().graft(G(e, marked={e}))
 
 
@@ -242,13 +240,13 @@ def test_graft_node_to_non_null():
 
 def test_graft_edge_to_null():
     e = E(N(), N())
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G().graft(G(e))
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G().graft(G(e, marked={e}))
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G().graft(G(e, marked={e, e.source}))
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G().graft(G(e, marked={e, e.target}))
     assert G().graft(G(e, marked={e, e.source, e.target})) == G(e)
 
@@ -260,10 +258,10 @@ def test_graft_edge_to_non_null():
     e12 = E(n1, n2)
     e13 = E(n1, n3)
     e23 = E(n2, n3)
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G(n1, n2).graft(G(e12))
     assert G(n1, n2).graft(G(e12, marked={e12})).matches(G(e12))
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G(n1, n2).graft(G(e13, marked={e13}))
     assert G(n1, n2).graft(G(e13, marked={e13, n3})).matches(G(e13, n2))
     assert G(n1).graft(
@@ -426,5 +424,5 @@ def test_prune_empty_pattern():
 
 def test_prune_mismatch():
     e = E(N(x=1), N(x=2))
-    with pytest.raises(G.Mismatch):
+    with pytest.raises(Graph.Mismatch):
         G().prune(G(e, marked={e}))

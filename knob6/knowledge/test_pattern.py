@@ -1,6 +1,6 @@
 """Knob6 knowledge graph pattern tests."""
 import pytest
-from knob6.knowledge import \
+from knob6.knowledge.pattern import \
     EntityGraph as E, RelationGraph as R, FunctionGraph as F
 from knob6.directed import Graph as DG
 
