@@ -2,6 +2,7 @@
 KNOB - Knowledge graph
 """
 
+import html
 import graphviz  # type: ignore
 from knob6 import directed
 from knob6.knowledge import pattern  # noqa: F401
@@ -17,16 +18,33 @@ class Graph(directed.Graph):
     def graphviz_format_label(cls, id: str, element: directed.Elements,
                               marked: bool):
         """Format a label for a graphviz element"""
+        if not element.attrs:
+            return ""
+        label = '<<TABLE BORDER="0">'
         attrs = element.attrs.copy()
-        keys = []
-        for k in ("_type", "_name"):
-            if v := attrs.pop(k, ""):
-                keys.append(cls.graphviz_quote(v))
-        return "\\n".join(
-            [("", "+")[marked] + ".".join(keys)] +
-            [f"{cls.graphviz_quote(n)}={cls.graphviz_trim(v)!r}"
-             for n, v in attrs.items()]
-        )
+        if v:= attrs.pop("_type", ""):
+            label += (
+                f'<TR><TD COLSPAN="2">'
+                f'<I>{html.escape(str(v))}</I>'
+                f'</TD></TR>'
+            )
+        if v:= attrs.pop("_name", ""):
+            label += (
+                f'<TR><TD COLSPAN="2">'
+                f'<B>{html.escape(str(v))}</B>'
+                f'</TD></TR>'
+            )
+        for k, v in attrs.items():
+            label += (
+                f'<TR>'
+                f'<TD ALIGN="RIGHT">{html.escape(k)}:</TD>'
+                f'<TD ALIGN="LEFT">'
+                f'{html.escape(str(cls.graphviz_trim(v)))}'
+                f'</TD>'
+                f'</TR>'
+            )
+        label += "</TABLE>>"
+        return label
 
     def graphviz(self) -> str:
         """
