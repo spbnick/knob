@@ -1,50 +1,55 @@
 #!/usr/bin/env python3
 
+import sys
 import knob
 
-graph = knob.Graph()
-e = graph.entities
+g = knob.knowledge.Graph()
+e = knob.knowledge.pattern.EntityGraph()
+r = knob.knowledge.pattern.RelationGraph()
+f = knob.knowledge.pattern.FunctionGraph()
 n = e[""]
-r = graph.relations
 s = e.ll_state
 t = r.ll_state_transition
+role = e.role
 
-s.Advertising(
+g **= +n.Device
+
+g **= +s.Advertising(
     implementation_required=True,
     comment="Device in this state is an \"advertiser\", and is "
             "transmitting advertising physical channel packets, "
             "and listening and responding to responses."
-) >> e.role.Advertiser << n.Device
+) >> +role.Advertiser << n.Device
 
-s.Scanning(
+g **= +s.Scanning(
     implementation_required=True,
     comment="Device in this state is a \"scanner\", and is listening for "
             "advertising physical channel packets from devices that are "
             "advertising. This state can be entered from the Standby state."
-) >> e.role.Scanner << n.Device
+) >> +role.Scanner << n.Device
 
-s.Standby(
-    comment="The Link Layer in the Standby state does not transmit or "
-            "receive any packets. The Standby state can be entered from "
-            "any other state."
-)
-
-s.Initiating(
+g **= +s.Initiating(
     comment="The Link Layer in the Initiating state will be listening for "
             "advertising physical channel packets from a specific device(s) "
             "and responding to these packets to initiate a connection with "
             "another device. A device in the Initiating state is known as an "
             "initiator. The Initiating state can be entered from the Standby "
             "state."
-) >> e.role.Initiator << n.Device
+) >> +role.Initiator << n.Device
 
-s.Connection(
+g **= +s.Standby(
+    comment="The Link Layer in the Standby state does not transmit or "
+            "receive any packets. The Standby state can be entered from "
+            "any other state."
+)
+
+g **= +s.Connection(
     comment="The Connection state can be entered either from the Initiating "
             "state or the Advertising state. A device in the Connection "
             "state is known as being in a connection."
-) >> e.role["In a Connection"] << n.Device
+) >> +role["In a Connection"] << n.Device
 
-s.Synchronization(
+g **= +s.Synchronization(
     comment="The Link Layer in the Synchronization State will be listening "
             "for periodic physical channel packets forming a specific "
             "periodic advertising train, coming from a specified device that "
@@ -55,88 +60,91 @@ s.Synchronization(
             "Broadcast Isochronous Group (BIG). A device that is in the "
             "Synchronization State and is receiving isochronous data packets "
             "is referred to as a Synchronized Receiver."
-) >> e.role["Synchronized Receiver"] << n.Device
+) >> +role["Synchronized Receiver"] << n.Device
 
-s["Isochronous Broadcasting"](
+g **= +s["Isochronous Broadcasting"](
     comment="The Link Layer in the Isochronous Broadcasting State will "
             "transmit isochronous data packets on an isochronous physical "
             "channel. The Isochronous Broadcasting State can be entered from "
             "the Standby State. A device that is in the Isochronous "
             "Broadcasting State is referred to as an Isochronous Broadcaster."
-) >> e.role["Isochronous Broadcaster"] << n.Device
+) >> +role["Isochronous Broadcaster"] << n.Device
 
-s.Advertising >> t >> s.Standby
-s.Advertising << t << s.Standby
-s.Advertising >> t >> e.role.Peripheral
+g **= +role.Peripheral(
+    comment="The Link Layer in the Peripheral Role will communicate with a "
+            "single device in the Central Role."
+) << n.Device
 
-s["Isochronous Broadcasting"] >> t >> s.Standby
-s["Isochronous Broadcasting"] << t << s.Standby
-
-s.Scanning >> t >> s.Standby
-s.Scanning << t << s.Standby
-
-s.Synchronization >> t >> s.Standby
-s.Synchronization << t << s.Standby
-
-s.Initiating >> t >> s.Standby
-s.Initiating << t << s.Standby
-s.Initiating >> t >> e.role.Central
-
-s.Connection >> e.role.Central >> t >> s.Standby
-s.Connection >> e.role.Peripheral >> t >> s.Standby
-
-e.role.Central(
+g **= +role.Central(
     comment="The Link Layer in the Central Role will communicate with a "
             "device in the Peripheral Role and define the timings of "
             "transmissions."
 ) << n.Device
 
-e.role.Peripheral(
-    comment="The Link Layer in the Peripheral Role will communicate with a "
-            "single device in the Central Role."
-) << n.Device
+g **= s.Advertising >> +t >> s.Standby
+g **= s.Advertising << +t << s.Standby
+g **= s.Advertising >> +t >> role.Peripheral
 
-n.Device >> r.identified_by >> [
-    n["Device Address Type"],
-    n["Device Address"]
-]
-n["Device Address"] << r.type_of(
-    identified_by=n["Device Address Type"]
-) << [
-    n["Public Device Address"](
+g **= s["Isochronous Broadcasting"] >> +t >> s.Standby
+g **= s["Isochronous Broadcasting"] << +t << s.Standby
+
+g **= s.Scanning >> +t >> s.Standby
+g **= s.Scanning << +t << s.Standby
+
+g **= s.Synchronization >> +t >> s.Standby
+g **= s.Synchronization << +t << s.Standby
+
+g **= s.Initiating >> +t >> s.Standby
+g **= s.Initiating << +t << s.Standby
+g **= s.Initiating >> +t >> role.Central
+
+g **= s.Connection >> + r >> role.Central >> +t >> s.Standby
+g **= s.Connection >> + r >> role.Peripheral >> +t >> s.Standby
+
+g **= n.Device >> +r.identified_by >> +n["Device Address Type"]
+g **= n.Device >> +r.identified_by >> +n["Device Address"]
+
+g **= n["Device Address"] << (x := ~+r.type_of) << \
+    +n["Public Device Address"](
         length_bits=48,
         created_according_to="[Vol 2] Part B, Section 1.2",
-    ),
-    n["Random Device Address"](
-        length_bits=48
-    ),
-]
+    ) | x * +f.identified_by - n["Device Address Type"]
 
-n.Device >> n["Identity Address"] << r.type_of << [
-    n["Public Device Address"],
-    n["Random Static Device Address"],
-]
+g **= n["Device Address"] << (x := ~+r.type_of) << \
+    +n["Random Device Address"](
+        length_bits=48
+    ) | x * +f.identified_by - n["Device Address Type"]
+
+g **= (
+    n.Device >> (x := ~+n["Identity Address"]) |
+    x << +r.type_of << n["Public Device Address"] |
+    x << +r.type_of << +n["Random Static Device Address"](
+        comment="Shall meet the following requirements:\n"
+                "• At least one bit of the random part of the address "
+                "shall be 0\n"
+                "• At least one bit of the random part of the address "
+                "shall be 1\n"
+                "\n"
+                "A device may choose to initialize its static address to "
+                "a new value after each power cycle. A device shall not "
+                "change its static address value once initialized "
+                "until the device is power cycled.\n"
+                "\n"
+                "Note: If the static address of a device is changed, "
+                "then the address stored in peer devices will not be "
+                "valid and the ability to reconnect using the old "
+                "address will be lost."
+    )
+)
+
+sys.stdout.write((g @ (e >> r.type_of >> e | e >> r.identified_by >> e)).graphviz())
+#sys.stdout.write(g.graphviz())
+sys.exit()
 
 n["Random Device Address"] << r.type_of << [
     e.bitfield_value["Static device address"] << \
         r.identified_by << \
-        n["Random Static Device Address"](
-            comment="Shall meet the following requirements:\n"
-                    "• At least one bit of the random part of the address "
-                    "shall be 0\n"
-                    "• At least one bit of the random part of the address "
-                    "shall be 1\n"
-                    "\n"
-                    "A device may choose to initialize its static address to "
-                    "a new value after each power cycle. A device shall not "
-                    "change its static address value once initialized "
-                    "until the device is power cycled.\n"
-                    "\n"
-                    "Note: If the static address of a device is changed, "
-                    "then the address stored in peer devices will not be "
-                    "valid and the ability to reconnect using the old "
-                    "address will be lost."
-        ),
+        n["Random Static Device Address"],
     [
         e.bitfield_value["Non-resolvable private address"] << \
             r.identified_by << \
@@ -185,5 +193,3 @@ e.bitfield["Random Device Address Random Part"] >> \
         comment="Requirements: at least one bit shall be 0, "
                 "at least one bit shall be 1"
     )
-
-print(graph.render_graphviz())

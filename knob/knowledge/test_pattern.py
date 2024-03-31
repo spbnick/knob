@@ -1,8 +1,8 @@
 """Knob6 knowledge graph pattern tests."""
 import pytest
-from knob6.knowledge.pattern import \
+from knob.knowledge.pattern import \
     EntityGraph as E, RelationGraph as R, FunctionGraph as F
-from knob6.directed import Graph as DG
+from knob.directed import Graph as DG
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring

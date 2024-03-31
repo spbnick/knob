@@ -4,8 +4,8 @@ KNOB - Knowledge graph
 
 import html
 import graphviz  # type: ignore
-from knob6 import directed
-from knob6.knowledge import pattern  # noqa: F401
+from knob import directed
+from knob.knowledge import pattern  # noqa: F401
 
 # NO, pylint: disable=use-dict-literal
 # We like our "id", pylint: disable=redefined-builtin

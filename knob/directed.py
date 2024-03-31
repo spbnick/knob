@@ -5,7 +5,7 @@ KNOB - The directed graph (pattern)
 from typing import cast, Final, Generator, Dict, Optional, Self
 from copy import copy
 import graphviz  # type: ignore
-from knob6.misc import AttrTypes, attrs_repr
+from knob.misc import AttrTypes, attrs_repr
 
 # NO, pylint: disable=use-dict-literal
 # We need them, pylint: disable=fixme

@@ -4,7 +4,7 @@ import functools
 from copy import copy
 from typing import Optional
 import pytest
-from knob6.directed import Node as N, Edge as E, Graph, Elements
+from knob.directed import Node as N, Edge as E, Graph, Elements
 
 # Ah, come on, pylint: disable=invalid-name, redefined-outer-name
 # Boooring, pylint: disable=missing-function-docstring
