@@ -115,37 +115,36 @@ g **= n["Device Address"] << (x := ~+r.type_of) << \
         length_bits=48
     ) | x * +f.identified_by - n["Device Address Type"]
 
-with open("ble4.gv", "w") as file:
-    #file.write((g @ (e >> t >> e)).graphviz())
-    file.write(g.graphviz())
+g **= (
+    n.Device >> (x := ~+n["Identity Address"]) |
+    x << +r.type_of << n["Public Device Address"] |
+    x << +r.type_of << +n["Random Static Device Address"](
+        comment="Shall meet the following requirements:\n"
+                "• At least one bit of the random part of the address "
+                "shall be 0\n"
+                "• At least one bit of the random part of the address "
+                "shall be 1\n"
+                "\n"
+                "A device may choose to initialize its static address to "
+                "a new value after each power cycle. A device shall not "
+                "change its static address value once initialized "
+                "until the device is power cycled.\n"
+                "\n"
+                "Note: If the static address of a device is changed, "
+                "then the address stored in peer devices will not be "
+                "valid and the ability to reconnect using the old "
+                "address will be lost."
+    )
+)
+
+sys.stdout.write((g @ (e >> r.type_of >> e | e >> r.identified_by >> e)).graphviz())
+#sys.stdout.write(g.graphviz())
 sys.exit()
-
-
-n.Device >> n["Identity Address"] << r.type_of << [
-    n["Public Device Address"],
-    n["Random Static Device Address"],
-]
 
 n["Random Device Address"] << r.type_of << [
     e.bitfield_value["Static device address"] << \
         r.identified_by << \
-        n["Random Static Device Address"](
-            comment="Shall meet the following requirements:\n"
-                    "• At least one bit of the random part of the address "
-                    "shall be 0\n"
-                    "• At least one bit of the random part of the address "
-                    "shall be 1\n"
-                    "\n"
-                    "A device may choose to initialize its static address to "
-                    "a new value after each power cycle. A device shall not "
-                    "change its static address value once initialized "
-                    "until the device is power cycled.\n"
-                    "\n"
-                    "Note: If the static address of a device is changed, "
-                    "then the address stored in peer devices will not be "
-                    "valid and the ability to reconnect using the old "
-                    "address will be lost."
-        ),
+        n["Random Static Device Address"],
     [
         e.bitfield_value["Non-resolvable private address"] << \
             r.identified_by << \
