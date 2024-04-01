@@ -130,92 +130,92 @@ def test_element_getitem_mark(e1, r1, f1):
 
 
 def test_func_fill(e1, r1, f1):
-    assert repr(e1 - f1.func) == "e1 < e1, f1.func[->e1] > f1"
-    assert repr(e1 - 'func') == "e1 < e1, f1.func[->e1] > f1"
-    assert repr('func' - e1) == "f1 < e1, f1.func[->e1] > e1"
-    assert repr(f1.func - e1) == "f1 < e1, f1.func[->e1] > e1"
-    assert repr(r1 - f1.func) == "r1 < r1, f1.func[->r1] > f1"
-    assert repr(r1 - 'func') == "r1 < r1, f1.func[->r1] > f1"
-    assert repr('func' - r1) == "f1 < r1, f1.func[->r1] > r1"
-    assert repr(f1.func - r1) == "f1 < r1, f1.func[->r1] > r1"
+    assert repr(e1 << f1.func) == "e1 < e1, f1.func[->e1] > f1"
+    assert repr(e1 << 'func') == "e1 < e1, f1.func[->e1] > f1"
+    assert repr('func' >> e1) == "f1 < e1, f1.func[->e1] > e1"
+    assert repr(f1.func >> e1) == "f1 < e1, f1.func[->e1] > e1"
+    assert repr(r1 << f1.func) == "r1 < r1, f1.func[->r1] > f1"
+    assert repr(r1 << 'func') == "r1 < r1, f1.func[->r1] > f1"
+    assert repr('func' >> r1) == "f1 < r1, f1.func[->r1] > r1"
+    assert repr(f1.func >> r1) == "f1 < r1, f1.func[->r1] > r1"
 
 
 def test_func_assign(e1, r1, f1):
     with pytest.raises(ValueError):
-        _ = e1 * f1
+        _ = e1 >> f1
     with pytest.raises(ValueError):
-        _ = e1 * f1.func
+        _ = e1 >> f1.func
     with pytest.raises(ValueError):
-        _ = e1 * 'func'
+        _ = e1 >> 'func'
     with pytest.raises(ValueError):
-        _ = f1 * e1
+        _ = f1 << e1
     with pytest.raises(ValueError):
-        _ = f1.func * e1
+        _ = f1.func << e1
     with pytest.raises(ValueError):
-        _ = 'func' * e1
-    assert repr(r1 * f1) == "r1 < r1, f1[r1->] > f1"
-    assert repr(r1 * f1.func) == "r1 < r1, f1.func[r1->] > f1"
-    assert repr(r1 * 'func') == "r1 < r1, f1.func[r1->] > f1"
-    assert repr(f1 * r1) == "f1 < r1, f1[r1->] > r1"
-    assert repr(f1.func * r1) == "f1 < r1, f1.func[r1->] > r1"
-    assert repr('func' * r1) == "f1 < r1, f1.func[r1->] > r1"
+        _ = 'func' << e1
+    assert repr(r1 >> f1) == "r1 < r1, f1[r1->] > f1"
+    assert repr(r1 >> f1.func) == "r1 < r1, f1.func[r1->] > f1"
+    assert repr(r1 >> 'func') == "r1 < r1, f1.func[r1->] > f1"
+    assert repr(f1 << r1) == "f1 < r1, f1[r1->] > r1"
+    assert repr(f1.func << r1) == "f1 < r1, f1.func[r1->] > r1"
+    assert repr('func' << r1) == "f1 < r1, f1.func[r1->] > r1"
 
 
 def test_func_assign_and_fill(e1, r1, f1):
-    assert repr(e1 - f1 * r1) == "e1 < e1, r1, f1[r1->e1] > r1"
-    assert repr(r1 * f1 - e1) == "r1 < e1, r1, f1[r1->e1] > e1"
+    assert repr(e1 << f1 << r1) == "e1 < e1, r1, f1[r1->e1] > r1"
+    assert repr(r1 >> f1 >> e1) == "r1 < e1, r1, f1[r1->e1] > e1"
 
 
 def test_func_complete(e1, r1, f1):
-    assert repr(e1 - f1.func * r1) == "e1 < e1, r1:(func=e1) > r1"
-    assert repr(e1 - 'func' * r1) == "e1 < e1, r1:(func=e1) > r1"
-    assert repr(e1 - 'ro le' * r1) == "e1 < e1, r1:{'ro le': e1} > r1"
-    assert repr(r1 * f1.func - e1) == "r1 < e1, r1:(func=e1) > e1"
-    assert repr(r1 * 'func' - e1) == "r1 < e1, r1:(func=e1) > e1"
-    assert repr(r1 * 'ro le' - e1) == "r1 < e1, r1:{'ro le': e1} > e1"
+    assert repr(e1 << f1.func << r1) == "e1 < e1, r1:(func=e1) > r1"
+    assert repr(e1 << 'func' << r1) == "e1 < e1, r1:(func=e1) > r1"
+    assert repr(e1 << 'ro le' << r1) == "e1 < e1, r1:{'ro le': e1} > r1"
+    assert repr(r1 >> f1.func >> e1) == "r1 < e1, r1:(func=e1) > e1"
+    assert repr(r1 >> 'func' >> e1) == "r1 < e1, r1:(func=e1) > e1"
+    assert repr(r1 >> 'ro le' >> e1) == "r1 < e1, r1:{'ro le': e1} > e1"
 
 
 def test_assign_filled_func(e1, r1, r2):
-    assert repr((e1 - 'func') * r1) == "e1 < e1, r1:(func=e1) > r1"
-    assert repr(r1 * ('func' - e1)) == "r1 < e1, r1:(func=e1) > e1"
+    assert repr((e1 << 'func') << r1) == "e1 < e1, r1:(func=e1) > r1"
+    assert repr(r1 >> ('func' >> e1)) == "r1 < e1, r1:(func=e1) > e1"
 
     with pytest.raises(ValueError):
-        (r1 - 'func') * e1
+        (r1 << 'func') << e1
     with pytest.raises(ValueError):
-        e1 * ('func' - r1)
+        e1 >> ('func' >> r1)
     with pytest.raises(ValueError):
-        (e1 - 'func') * e1
+        (e1 << 'func') << e1
     with pytest.raises(ValueError):
-        e1 * ('func' - e1)
+        e1 >> ('func' >> e1)
 
-    assert repr((r1 - 'func') * r2) == "r1 < r1, r2:(func=r1) > r2"
-    assert repr(r1 * ('func' - r2)) == "r1 < r1:(func=r2), r2 > r2"
+    assert repr((r1 << 'func') << r2) == "r1 < r1, r2:(func=r1) > r2"
+    assert repr(r1 >> ('func' >> r2)) == "r1 < r1:(func=r2), r2 > r2"
 
-    assert repr((r1.x - 'func') * r2.y) == "r1 < r1.x, r2.y:(func=r1) > r2"
-    assert repr(r1.x * ('func' - r2.y)) == "r1 < r1.x:(func=r2), r2.y > r2"
+    assert repr((r1.x << 'func') << r2.y) == "r1 < r1.x, r2.y:(func=r1) > r2"
+    assert repr(r1.x >> ('func' >> r2.y)) == "r1 < r1.x:(func=r2), r2.y > r2"
 
-    assert repr((r1.x(a=1) - 'func') * r2.y(b=2)) == \
+    assert repr((r1.x(a=1) << 'func') << r2.y(b=2)) == \
         "r1 < r1.x(a=1), r2.y(b=2):(func=r1) > r2"
-    assert repr(r1.x(a=1) * ('func' - r2.y(b=2))) == \
+    assert repr(r1.x(a=1) >> ('func' >> r2.y(b=2))) == \
         "r1 < r1.x(a=1):(func=r2), r2.y(b=2) > r2"
 
 
 def test_double_fill(e1):
     with pytest.raises(ValueError):
-        e1 - 'func' - e1
+        e1 << 'func' >> e1
 
 
 def test_double_assign(r1):
     with pytest.raises(ValueError):
-        r1 * 'func' * r1
+        r1 >> 'func' << r1
 
 
 def test_entity_shift_entity(e1, e2, r1):
     assert repr(e1 >> e2) == "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
-    assert repr(e1 - 'source' * r1 * 'target' - e2) == \
+    assert repr(e1 << 'source' << r1 >> 'target' >> e2) == \
         "e1 < e1, e2, r1:(source=e1, target=e2) > e2"
     assert repr(e1 << e2) == "e1 < e1, e2, r1:(source=e2, target=e1) > e2"
-    assert repr(e1 - 'target' * r1 * 'source' - e2) == \
+    assert repr(e1 << 'target' << r1 >> 'source' >> e2) == \
         "e1 < e1, e2, r1:(source=e2, target=e1) > e2"
 
 
@@ -243,7 +243,7 @@ def test_relation_shift_relation(r1, r2):
 
 
 def test_mark_func(r1, f1, e1):
-    assert repr(r1 * +f1.func - e1) == "r1 < e1, r1:(+func=e1) > e1"
+    assert repr(r1 >> +f1.func >> e1) == "r1 < e1, r1:(+func=e1) > e1"
 
 
 def test_refs():

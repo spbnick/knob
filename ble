@@ -108,12 +108,12 @@ g **= n["Device Address"] << (x := ~+r.type_of) << \
     +n["Public Device Address"](
         length_bits=48,
         created_according_to="[Vol 2] Part B, Section 1.2",
-    ) | x * +f.identified_by - n["Device Address Type"]
+    ) | x >> +f.identified_by >> n["Device Address Type"]
 
 g **= n["Device Address"] << (x := ~+r.type_of) << \
     +n["Random Device Address"](
         length_bits=48
-    ) | x * +f.identified_by - n["Device Address Type"]
+    ) | x >> +f.identified_by >> n["Device Address Type"]
 
 g **= (
     n.Device >> (x := ~+n["Identity Address"]) |

@@ -594,14 +594,6 @@ class Graph:
             marked[function_id] = True
         return Graph(elements, marked, left_id, right_id)
 
-    def __sub__(self, other) -> 'Graph':
-        """Fill a function with an element (for S - O expression)"""
-        return self._fill(self, other)
-
-    def __rsub__(self, other) -> 'Graph':
-        """Fill a function with an element (for O - S expression)"""
-        return self._fill(other, self)
-
     @staticmethod
     def _assign(left, right) -> 'Graph':
         """Assign a (filled) function to a boundary relation"""
@@ -661,50 +653,60 @@ class Graph:
             marked[function_id] = True
         return Graph(elements, marked, left_id, right_id)
 
-    def __mul__(self, other) -> 'Graph':
-        """Assign a function (for S * O expression)"""
-        return self._assign(self, other)
-
-    def __rmul__(self, other) -> 'Graph':
-        """Assign a function (for O * S expression)"""
-        return self._assign(other, self)
-
     @staticmethod
     def _shift(left, op: str, right) -> 'Graph':
         """Create a relation or a function for a shift operator"""
         # No it's not, pylint: disable=too-many-return-statements
+        # It's OK, pylint: disable=too-many-branches
         assert op in {"<<", ">>"}
 
-        if not isinstance(left, Graph) or not isinstance(right, Graph):
+        if isinstance(left, str):
+            left = FunctionGraph(left)
+        elif not isinstance(left, Graph):
             return NotImplemented
 
+        if isinstance(right, str):
+            right = FunctionGraph(right)
+        elif not isinstance(right, Graph):
+            return NotImplemented
+
+        marked = left.marked.get(left.right) or right.marked.get(right.left)
         ltr = op == ">>"
         left_element = left.elements[left.right]
+        left_type = next(t for t in (Entity, Relation, Function)
+                         if isinstance(left_element, t))
         right_element = right.elements[right.left]
+        right_type = next(t for t in (Entity, Relation, Function)
+                          if isinstance(right_element, t))
+        if ltr:
+            source_type = left_type
+            target_type = right_type
+        else:
+            source_type = right_type
+            target_type = left_type
 
-        if isinstance(left_element, Entity) and \
-           isinstance(right_element, Entity) or \
-           isinstance(left_element, Relation) and \
-           isinstance(right_element, Relation):
+        if left_type in (Entity, Relation) and right_type == left_type:
             relation = RelationGraph()
-            if left.marked.get(left.right) or right.marked.get(right.left):
+            if marked:
                 relation = +relation
             if ltr:
-                return left - "source" * relation * "target" - right
+                return left << "source" << relation >> "target" >> right
             else:
-                return left - "target" * relation * "source" - right
-        elif isinstance(left_element, Relation) and \
-                isinstance(right_element, Entity):
-            if ltr:
-                return left * "target" - right
-            else:
-                return left * "source" - right
-        elif isinstance(left_element, Entity) and \
-                isinstance(right_element, Relation):
-            if ltr:
-                return left - "source" * right
-            else:
-                return left - "target" * right
+                return left << "target" << relation >> "source" >> right
+        elif left_type == Relation and right_type == Entity:
+            function = FunctionGraph("target" if ltr else "source")
+            if marked:
+                function = +function
+            return left >> function >> right
+        elif left_type == Entity and right_type == Relation:
+            function = FunctionGraph("source" if ltr else "target")
+            if marked:
+                function = +function
+            return left << function << right
+        elif source_type == Relation and target_type == Function:
+            return Graph._assign(left, right)
+        elif source_type == Function and target_type in (Relation, Entity):
+            return Graph._fill(left, right)
 
         raise ValueError
 
